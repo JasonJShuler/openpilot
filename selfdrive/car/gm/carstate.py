@@ -35,6 +35,10 @@ def get_powertrain_can_parser(CP, canbus):
     signals += [
       ("RegenPaddle", "EBCMRegenPaddle", 0),
     ]
+  if CP.carFingerprint == CAR.BOLT:
+    signals += [
+      ("RegenPaddle", "EBCMRegenPaddle", 0),
+    ]
   if CP.carFingerprint in SUPERCRUISE_CARS:
     signals += [
       ("ACCCmdActive", "ASCMActiveCruiseControlStatus", 0)
