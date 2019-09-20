@@ -16,7 +16,7 @@ NUM_SLOTS = 20
 LAST_RADAR_MSG = RADAR_HEADER_MSG + NUM_SLOTS
 
 def create_radar_can_parser(canbus, car_fingerprint):
-#TODO: BOLT does not have radar, but front facing camera calculates following distance
+  #TODO: BOLT does not have radar, but front facing camera calculates following distance
   dbc_f = DBC[car_fingerprint]['radar']
   if car_fingerprint in (CAR.VOLT, CAR.MALIBU, CAR.HOLDEN_ASTRA, CAR.ACADIA, CAR.CADILLAC_ATS):
     # C1A-ARS3-A by Continental
