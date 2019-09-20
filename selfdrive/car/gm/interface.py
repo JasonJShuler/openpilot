@@ -75,7 +75,7 @@ class CarInterface(object):
       ret.centerToFront = ret.wheelbase * 0.4 # wild guess
 
     elif candidate == CAR.BOLT:
-      # supports stop and go, but initial engage must be above 18mph (which include conservatism)
+      # initial engage unkown - copied from Volt. Stop and go unknown.
       ret.minEnableSpeed = 18 * CV.MPH_TO_MS
       ret.mass = 1616. + STD_CARGO_KG
       ret.safetyModel = car.CarParams.SafetyModel.gm
