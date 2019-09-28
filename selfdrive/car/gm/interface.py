@@ -308,8 +308,9 @@ class CarInterface(object):
         events.append(create_event('pedalPressed', [ET.PRE_ENABLE]))
       if ret.cruiseState.standstill:
         events.append(create_event('resumeRequired', [ET.WARNING]))
-      if self.CS.pcm_acc_status == AccState.FAULTED:
-        events.append(create_event('controlsFailed', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
+      # JS - TEMP Disable, Bolt has no ACC
+      #if self.CS.pcm_acc_status == AccState.FAULTED:
+      #  events.append(create_event('controlsFailed', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
 
       # handle button presses
       for b in ret.buttonEvents:
