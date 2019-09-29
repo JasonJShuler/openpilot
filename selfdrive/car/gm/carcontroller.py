@@ -76,7 +76,6 @@ class CarController(object):
     self.apply_steer_last = 0
     self.car_fingerprint = car_fingerprint
     self.lka_icon_status_last = (False, False)
-    self.eps_fault_counter = 0
 
     # Setup detection helper. Routes commands to
     # an appropriate CAN bus number.
@@ -99,15 +98,11 @@ class CarController(object):
     steer = alert_out
 
     ### STEER ###
-    #if eps is faulted we are going to try not sending LKAS commands at all for a while
-    #TODO: maybe we switch the safety mode to no_output for some period of time
-    #I am not confident this is actually blocking the message sending
-    if CS.steer_not_allowed and self.eps_fault_counter == 0:
-      self.eps_fault_counter = 200
 
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
-      if lkas_enabled:
+      #Maybe it freaks out when lkas is sent while brake or gas is pressed?
+      if lkas_enabled and not CS.user_brake > 0 and not CS.user_gas_pressed:
         apply_steer = actuators.steer * P.STEER_MAX
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
@@ -120,12 +115,8 @@ class CarController(object):
         can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
           canbus, apply_steer, CS.v_ego, idx, lkas_enabled)
       else:
-        # skip sending lkas for some cycles
-        if self.eps_fault_counter == 0:
-          can_sends.append(gmcan.create_steering_control(self.packer_pt,
-            canbus.powertrain, apply_steer, idx, lkas_enabled))
-        else:
-          self.eps_fault_counter = self.eps_fault_counter - 1
+        can_sends.append(gmcan.create_steering_control(self.packer_pt,
+          canbus.powertrain, apply_steer, idx, lkas_enabled))
 
     ### GAS/BRAKE ###
 
