@@ -82,7 +82,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     preLaneChangeLeft @57;
     preLaneChangeRight @58;
     laneChange @59;
-    steerTempUnavailable @60;
   }
 }
 
