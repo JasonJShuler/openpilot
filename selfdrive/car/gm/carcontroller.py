@@ -100,8 +100,10 @@ class CarController(object):
 
     ### STEER ###
     #if eps is faulted we are going to try not sending LKAS commands at all for a while
+    #TODO: maybe we switch the safety mode to no_output for some period of time
+    #I am not confident this is actually blocking the message sending
     if CS.steer_not_allowed and self.eps_fault_counter == 0:
-      self.eps_fault_counter = 20
+      self.eps_fault_counter = 200
 
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED

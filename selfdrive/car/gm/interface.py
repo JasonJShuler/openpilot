@@ -273,7 +273,10 @@ class CarInterface(object):
     if self.CS.steer_error:
       events.append(create_event('steerUnavailable', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.PERMANENT]))
     if self.CS.steer_not_allowed:
-      events.append(create_event('steerTempUnavailable', [ET.NO_ENTRY, ET.WARNING]))
+      if self.CC.eps_fault_counter == 0:
+        events.append(create_event('steerTempUnavailable', [ET.NO_ENTRY, ET.WARNING]))
+      else:
+        events.append(create_event('steerEventsBlocked', [ET.NO_ENTRY, ET.WARNING]))
     if ret.doorOpen:
       events.append(create_event('doorOpen', [ET.NO_ENTRY, ET.SOFT_DISABLE]))
     if ret.seatbeltUnlatched:
