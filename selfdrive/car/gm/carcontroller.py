@@ -101,8 +101,7 @@ class CarController(object):
 
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
-      #Maybe it freaks out when lkas is sent while brake or gas is pressed?
-      if lkas_enabled and not CS.user_brake > 0 and not CS.user_gas_pressed:
+      if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
