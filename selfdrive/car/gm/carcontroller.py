@@ -32,6 +32,7 @@ class CarControllerParams():
 
     # Takes case of "Service Adaptive Cruise" and "Service Front Camera"
     # dashboard messages.
+    # TODO: this is not working on Bolt
     self.ADAS_KEEPALIVE_STEP = 100
     self.CAMERA_KEEPALIVE_STEP = 100
 
@@ -98,6 +99,12 @@ class CarController(object):
     steer = alert_out
 
     ### STEER ###
+    # While steer command is active, rate is higher (for Bolt anyway)
+    # TODO: flip logic around a bit so we can increase the rate only when apply_steer is non-zero
+    if enabled:
+      P.STEER_STEP = 1
+    else:
+      P.STEER_STEP = 2
 
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
@@ -174,6 +181,7 @@ class CarController(object):
       # alarming orange icon when approaching torque limit.
       # If not sent again, LKA icon disappears in about 5 seconds.
       # Conveniently, sending camera message periodically also works as a keepalive.
+      #TODO: camera keepaive may be different on Bolt
       lka_active = CS.lkas_status == 1
       lka_critical = lka_active and abs(actuators.steer) > 0.9
       lka_icon_status = (lka_active, lka_critical)
