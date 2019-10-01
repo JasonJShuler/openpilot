@@ -80,10 +80,9 @@ class CarInterface(object):
       ret.mass = 1616. + STD_CARGO_KG
       ret.safetyModel = car.CarParams.SafetyModel.gm
       ret.wheelbase = 2.60096
-      ret.steerRatio = 15.7
+      ret.steerRatio = 16.8
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.4 # wild guess
-      
       
     elif candidate == CAR.MALIBU:
       # supports stop and go, but initial engage must be above 18mph (which include conservatism)
@@ -308,9 +307,10 @@ class CarInterface(object):
         events.append(create_event('pedalPressed', [ET.PRE_ENABLE]))
       if ret.cruiseState.standstill:
         events.append(create_event('resumeRequired', [ET.WARNING]))
-      # JS - TEMP Disable, Bolt has no ACC
-      #if self.CS.pcm_acc_status == AccState.FAULTED:
-      #  events.append(create_event('controlsFailed', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
+      # TODO: Bolt may not be the only car without ACC
+      if not self.CS.car_fingerprint == CAR.BOLT:
+        if self.CS.pcm_acc_status == AccState.FAULTED:
+          events.append(create_event('controlsFailed', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
 
       # handle button presses
       for b in ret.buttonEvents:

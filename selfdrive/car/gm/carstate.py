@@ -31,11 +31,7 @@ def get_powertrain_can_parser(CP, canbus):
     ("LKATorqueDeliveredStatus", "PSCMStatus", 0),
   ]
 
-  if CP.carFingerprint == CAR.VOLT:
-    signals += [
-      ("RegenPaddle", "EBCMRegenPaddle", 0),
-    ]
-  if CP.carFingerprint == CAR.BOLT:
+  if CP.carFingerprint == CAR.VOLT or CP.carFingerprint == CAR.BOLT:
     signals += [
       ("RegenPaddle", "EBCMRegenPaddle", 0),
     ]
@@ -139,7 +135,7 @@ class CarState(object):
       self.acc_active = False
       self.esp_disabled = pt_cp.vl["ESPStatus"]['TractionControlOn'] != 1
       self.pcm_acc_status = pt_cp.vl["AcceleratorPedal2"]['CruiseState']
-      if self.car_fingerprint == CAR.VOLT:
+      if self.car_fingerprint == CAR.VOLT or self.car_fingerprint == CAR.BOLT:
         self.regen_pressed = bool(pt_cp.vl["EBCMRegenPaddle"]['RegenPaddle'])
       else:
         self.regen_pressed = False
