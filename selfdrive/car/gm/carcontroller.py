@@ -99,13 +99,6 @@ class CarController(object):
     steer = alert_out
 
     ### STEER ###
-    # While steer command is active, rate is higher (for Bolt anyway)
-    # TODO: flip logic around a bit so we can increase the rate only when apply_steer is non-zero
-    if enabled:
-      P.STEER_STEP = 1
-    else:
-      P.STEER_STEP = 2
-
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       if lkas_enabled:
