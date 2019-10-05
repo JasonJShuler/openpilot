@@ -4,7 +4,7 @@ from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.gm import gmcan
-from selfdrive.car.gm.values import DBC, SUPERCRUISE_CARS
+from selfdrive.car.gm.values import DBC, SUPERCRUISE_CARS, CAR
 from selfdrive.can.packer import CANPacker
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -18,6 +18,12 @@ class CarControllerParams():
       self.STEER_DELTA_UP = 2          # 0.75s time to peak torque
       self.STEER_DELTA_DOWN = 5        # 0.3s from peak torque to zero
       self.MIN_STEER_SPEED = -1.       # can steer down to zero
+    elif car_fingerprint == CAR.BOLT:
+      self.STEER_MAX = 300
+      self.STEER_STEP = 2              # how often we update the steer cmd
+      self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
+      self.STEER_DELTA_DOWN = 7       # ~0.3s from peak torque to zero
+      self.MIN_STEER_SPEED = 3.
     else:
       self.STEER_MAX = 300
       self.STEER_STEP = 2              # how often we update the steer cmd
@@ -99,6 +105,7 @@ class CarController(object):
     steer = alert_out
 
     ### STEER ###
+    
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       if lkas_enabled:
@@ -106,6 +113,9 @@ class CarController(object):
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
         apply_steer = 0
+        apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
+        if not apply_steer == 0:
+          lkas_enabled = True
 
       self.apply_steer_last = apply_steer
       idx = (frame // P.STEER_STEP) % 4
@@ -147,28 +157,30 @@ class CarController(object):
         at_full_stop = enabled and CS.standstill
         can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, canbus.powertrain, apply_gas, idx, enabled, at_full_stop))
 
-      # Send dashboard UI commands (ACC status), 25hz
-      if (frame % 4) == 0:
-        can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, canbus.powertrain, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car))
+      if not self.car_fingerprint == CAR.BOLT:
+        # Send dashboard UI commands (ACC status), 25hz
+        if (frame % 4) == 0:
+          can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, canbus.powertrain, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car))
 
       # Radar needs to know current speed and yaw rate (50hz),
       # and that ADAS is alive (10hz)
       time_and_headlights_step = 10
       tt = frame * DT_CTRL
 
-      if frame % time_and_headlights_step == 0:
-        idx = (frame // time_and_headlights_step) % 4
-        can_sends.append(gmcan.create_adas_time_status(canbus.obstacle, int((tt - self.start_time) * 60), idx))
-        can_sends.append(gmcan.create_adas_headlights_status(canbus.obstacle))
+      if not self.car_fingerprint == CAR.BOLT:
+        if frame % time_and_headlights_step == 0:
+          idx = (frame // time_and_headlights_step) % 4
+          can_sends.append(gmcan.create_adas_time_status(canbus.obstacle, int((tt - self.start_time) * 60), idx))
+          can_sends.append(gmcan.create_adas_headlights_status(canbus.obstacle))
 
-      speed_and_accelerometer_step = 2
-      if frame % speed_and_accelerometer_step == 0:
-        idx = (frame // speed_and_accelerometer_step) % 4
-        can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
-        can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
+        speed_and_accelerometer_step = 2
+        if frame % speed_and_accelerometer_step == 0:
+          idx = (frame // speed_and_accelerometer_step) % 4
+          can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
+          can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
 
-      if frame % P.ADAS_KEEPALIVE_STEP == 0:
-        can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
+        if frame % P.ADAS_KEEPALIVE_STEP == 0:
+          can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
       # Show green icon when LKA torque is applied, and
       # alarming orange icon when approaching torque limit.
