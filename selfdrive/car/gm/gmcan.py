@@ -100,21 +100,20 @@ def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lea
 
   return packer.make_can_msg("ASCMActiveCruiseControlStatus", bus, values)
 
-def create_ffc_keepalive(packer, canbus, idx):
-  vals = {
-    0x000000000000,
-    0x1000000fffff,
-    0x2000000ffffe,
-    0x3000000ffffd
-  }
+def create_ffc_keepalive(bus, idx):
+  vals = [
+    "\x00\x00\x00\x00\x00\x00",
+    "\x10\x00\x00\x0f\xff\xff",
+    "\x20\x00\x00\x0f\xff\xfe",
+    "\x30\x00\x00\x0f\xff\xfd"
+  ]
   #TODO: define in DBC, use rolling counter and checksum
-  return packer.make_can_msg(0x320, canbus, {vals[idx]})
-
-def create_ascm_365(packer, canbus):
-  #TODO: USE DBC
-  return packer.make_can_msg(0x365, canbus, {0x800030e0})
+  return [[0x365, 0, vals[idx], bus]]
 
 
+def create_ascm_365(bus):
+  dat = "\x80\x00\x30\xe0"
+  return [[0x365, 0, dat, bus]]
 
 
 def create_adas_time_status(bus, tt, idx):
