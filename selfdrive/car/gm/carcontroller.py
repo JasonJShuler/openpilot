@@ -178,11 +178,12 @@ class CarController(object):
         if frame % P.ADAS_KEEPALIVE_STEP == 0:
           can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
-      if self.car_fingerprint == CAR.BOLT:
-        if frame % P.CAMERA_KEEPALIVE_STEP == 0:
-          idx2 = (frame // P.CAMERA_KEEPALIVE_STEP) % 4
-          can_sends.append(gmcan.create_ffc_keepalive(canbus.powertrain, idx2))
-          can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
+      # TODO: figure out what I'm doing wrong here...
+      # if self.car_fingerprint == CAR.BOLT:
+      #   if frame % P.CAMERA_KEEPALIVE_STEP == 0:
+      #     idx2 = (frame // P.CAMERA_KEEPALIVE_STEP) % 4
+      #     can_sends.append(gmcan.create_ffc_keepalive(canbus.powertrain, idx2))
+      #     can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
         
         
 
