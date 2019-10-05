@@ -18,12 +18,6 @@ class CarControllerParams():
       self.STEER_DELTA_UP = 2          # 0.75s time to peak torque
       self.STEER_DELTA_DOWN = 5        # 0.3s from peak torque to zero
       self.MIN_STEER_SPEED = -1.       # can steer down to zero
-    elif car_fingerprint == CAR.BOLT:
-      self.STEER_MAX = 300
-      self.STEER_STEP = 2              # how often we update the steer cmd
-      self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
-      self.STEER_DELTA_DOWN = 7       # ~0.3s from peak torque to zero
-      self.MIN_STEER_SPEED = 3.
     else:
       self.STEER_MAX = 300
       self.STEER_STEP = 2              # how often we update the steer cmd
@@ -113,9 +107,11 @@ class CarController(object):
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
         apply_steer = 0
-        apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
-        if not apply_steer == 0:
-          lkas_enabled = True
+        #Bolt requires torque to be tapered
+        if self.car_fingerprint == CAR.BOLT:
+          apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
+          if not apply_steer == 0:
+            lkas_enabled = True
 
       self.apply_steer_last = apply_steer
       idx = (frame // P.STEER_STEP) % 4
@@ -182,12 +178,11 @@ class CarController(object):
         if frame % P.ADAS_KEEPALIVE_STEP == 0:
           can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
-      # Yeah, I think this broke everything...
-      # if self.car_fingerprint == CAR.BOLT:
-      #   if frame % P.CAMERA_KEEPALIVE_STEP == 0:
-      #     idx2 = (frame // P.CAMERA_KEEPALIVE_STEP) % 4
-      #     can_sends.append(gmcan.create_ffc_keepalive(self.packer_pt, canbus.powertrain, idx))
-      #     can_sends.append(gmcan.create_ascm_365(self.packer_pt, canbus.powertrain))
+      if self.car_fingerprint == CAR.BOLT:
+        if frame % P.CAMERA_KEEPALIVE_STEP == 0:
+          idx2 = (frame // P.CAMERA_KEEPALIVE_STEP) % 4
+          can_sends.append(gmcan.create_ffc_keepalive(self.packer_pt, canbus.powertrain, idx))
+          can_sends.append(gmcan.create_ascm_365(self.packer_pt, canbus.powertrain))
         
         
 

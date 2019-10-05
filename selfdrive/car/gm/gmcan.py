@@ -108,11 +108,11 @@ def create_ffc_keepalive(packer, canbus, idx):
     0x3000000ffffd
   }
   #TODO: define in DBC, use rolling counter and checksum
-  return packer.make_can_msg(0x320, canbus, vals[idx])
+  return packer.make_can_msg(0x320, canbus, {vals[idx]})
 
 def create_ascm_365(packer, canbus):
   #TODO: USE DBC
-  return packer.make_can_msg(0x365, canbus, 0x800030e0)
+  return packer.make_can_msg(0x365, canbus, {0x800030e0})
 
 
 

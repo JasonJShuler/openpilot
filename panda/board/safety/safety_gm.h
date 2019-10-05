@@ -192,7 +192,9 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     }
 
     if (violation) {
-      tx = 0;
+      //Bolt needs to taper torque or ASCM will fault
+      //TODO: figure out how to accomplish this safely
+      //tx = 0;
     }
   }
 
