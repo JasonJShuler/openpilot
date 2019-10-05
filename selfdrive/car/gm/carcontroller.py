@@ -113,10 +113,10 @@ class CarController(object):
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
         apply_steer = 0
-        #Bolt requires torque to be tapered
-        if self.car_fingerprint == CAR.BOLT:
-          if not self.apply_steer_last == 0:
-            lkas_enabled = True
+        # #Bolt requires torque to be tapered
+        # if self.car_fingerprint == CAR.BOLT:
+        #   if not self.apply_steer_last == 0:
+        #     lkas_enabled = True
 
 
         # if self.car_fingerprint == CAR.BOLT:
@@ -188,15 +188,6 @@ class CarController(object):
 
         if frame % P.ADAS_KEEPALIVE_STEP == 0:
           can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
-
-      # TODO: figure out what I'm doing wrong here...
-      # if self.car_fingerprint == CAR.BOLT:
-      #   if frame % P.CAMERA_KEEPALIVE_STEP == 0:
-      #     idx2 = (frame // P.CAMERA_KEEPALIVE_STEP) % 4
-      #     can_sends.append(gmcan.create_ffc_keepalive(canbus.powertrain, idx2))
-      #     can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
-        
-        
 
       # Show green icon when LKA torque is applied, and
       # alarming orange icon when approaching torque limit.
