@@ -113,11 +113,6 @@ class CarController(object):
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
       else:
         apply_steer = 0
-        #Bolt may require torque to be tapered
-        # if self.car_fingerprint == CAR.BOLT:
-        #   apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
-        #   if not apply_steer == 0:
-        #     lkas_enabled = True
 
       self.apply_steer_last = apply_steer
       idx = (frame // P.STEER_STEP) % 4
