@@ -65,6 +65,7 @@ Supported Cars
 | Buick<sup>3</sup>    | Regal 2018                 | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>7</sup>|
 | Chevrolet<sup>3</sup>| Malibu 2017                | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>7</sup>|
 | Chevrolet<sup>3</sup>| Volt 2017-18               | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>7</sup>|
+| Chevrolet<sup>3</sup>| Bolt 2019                  | Driver Confidence II | Yes     | No             | 0mph             | 7mph           | Custom<sup>8</sup>|
 | Cadillac<sup>3</sup> | ATS 2018                   | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>7</sup>|
 | Chrysler             | Pacifica 2017-18           | Adaptive Cruise      | Yes     | Stock          | 0mph             | 9mph           | FCA               |
 | Chrysler             | Pacifica Hybrid 2017-18    | Adaptive Cruise      | Yes     | Stock          | 0mph             | 9mph           | FCA               |
@@ -127,6 +128,8 @@ Supported Cars
 <sup>5</sup>28mph for Camry 4CYL L, 4CYL LE and 4CYL SE which don't have Full-Speed Range Dynamic Radar Cruise Control. <br />
 <sup>6</sup>Open sourced [Hyundai Giraffe](https://github.com/commaai/neo/tree/master/giraffe/hyundai) is designed for the 2019 Sante Fe; pinout may differ for other Hyundais. <br />
 <sup>7</sup>Community built Giraffe, find more information [here](https://zoneos.com/shop/). <br />
+<sup>8</sup>Community built Giraffe, find more information [here](TODO). <br />
+
 
 Community Maintained Cars
 ------
