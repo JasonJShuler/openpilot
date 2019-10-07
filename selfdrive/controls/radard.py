@@ -179,7 +179,9 @@ def radard_thread(sm=None, pm=None, can_sock=None):
   # wait for stats about the car to come in from controls
   cloudlog.info("radard is waiting for CarParams")
   CP = car.CarParams.from_bytes(Params().get("CarParams", block=True))
-  mocked = CP.carName == "mock"
+  #mocked = CP.carName == "mock"
+  mocked = True
+
   cloudlog.info("radard got CarParams")
 
   # import the radar from the fingerprint
