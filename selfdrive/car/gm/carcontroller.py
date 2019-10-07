@@ -18,12 +18,6 @@ class CarControllerParams():
       self.STEER_DELTA_UP = 2          # 0.75s time to peak torque
       self.STEER_DELTA_DOWN = 5        # 0.3s from peak torque to zero
       self.MIN_STEER_SPEED = -1.       # can steer down to zero
-    # elif car_fingerprint == CAR.BOLT:
-    #   self.STEER_MAX = 300
-    #   self.STEER_STEP = 2              # how often we update the steer cmd
-    #   self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
-    #   self.STEER_DELTA_DOWN = 7       # ~0.3s from peak torque to zero
-    #   self.MIN_STEER_SPEED = 3.
     else:
       self.STEER_MAX = 300
       self.STEER_STEP = 2              # how often we update the steer cmd
@@ -51,6 +45,8 @@ class CarControllerParams():
     self.GAS_LOOKUP_V = [self.MAX_ACC_REGEN, ZERO_GAS, MAX_GAS]
     self.BRAKE_LOOKUP_BP = [-1., -0.25]
     self.BRAKE_LOOKUP_V = [MAX_BRAKE, 0]
+    # Bolt periodic disable
+    self.DISABLE_STEER_STEP = 1000
 
 
 def actuator_hystereses(final_pedal, pedal_steady):
@@ -108,6 +104,10 @@ class CarController(object):
     
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
+      # Bolt may have a max limit on continuous LKAS activation
+      if self.car_fingerprint == CAR.BOLT and (frame % P.DISABLE_STEER_STEP == 0):
+        lkas_enabled = False
+
       if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
         apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
