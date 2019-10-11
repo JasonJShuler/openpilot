@@ -105,8 +105,8 @@ class CarController(object):
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       # Bolt may have a max limit on continuous LKAS activation
-      if self.car_fingerprint == CAR.BOLT and (frame % P.DISABLE_STEER_STEP == 0):
-        lkas_enabled = False
+      #if self.car_fingerprint == CAR.BOLT and (frame % P.DISABLE_STEER_STEP == 0):
+      #  lkas_enabled = False
 
       if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
