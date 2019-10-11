@@ -255,13 +255,36 @@ static void gm_passive_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   }
 }
 
+static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
+
+  int bus_fwd = -1;
+  if (bus_num == 0) {
+    bus_fwd = 2;  // Camera CAN
+  }
+  if (bus_num == 2) {
+    int addr = GET_ADDR(to_fwd);
+    //TODO: capture the rolling_counter value
+    //TODO: allow to use stock LKAS optionally
+    int block_msg = (addr == 384);
+    if (!block_msg) {
+      bus_fwd = 0;  // Main CAN
+    }
+  }
+
+  // fallback to do not forward
+  return bus_fwd;
+}
+
+
+
+
 const safety_hooks gm_hooks = {
   .init = gm_init,
   .rx = gm_rx_hook,
   .tx = gm_tx_hook,
   .tx_lin = nooutput_tx_lin_hook,
   .ignition = gm_ign_hook,
-  .fwd = default_fwd_hook,
+  .fwd = gm_fwd_hook,
 };
 
 const safety_hooks gm_passive_hooks = {
