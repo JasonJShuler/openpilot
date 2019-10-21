@@ -19,6 +19,7 @@ const int GM_MAX_GAS = 3072;
 const int GM_MAX_REGEN = 1404;
 const int GM_MAX_BRAKE = 350;
 
+int gm_lkas_counter_prev = 0;
 int gm_brake_prev = 0;
 int gm_gas_prev = 0;
 bool gm_moving = false;
@@ -112,6 +113,9 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   }
 }
 
+
+
+
 // all commands: gas/regen, friction brake and steering
 // if controls_allowed and no pedals pressed
 //     allow all commands up to limit
@@ -158,6 +162,8 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     vals[3] = 0x30000ffdU;
 
     int rolling_counter = (GET_BYTE(to_send, 0) & 0x3U) >> 4;
+    int expected_counter = (gm_lkas_counter_prev + 1) % 4;
+    gm_lkas_counter_prev = rolling_counter;
     int desired_torque = ((GET_BYTE(to_send, 0) & 0x7U) << 8) + GET_BYTE(to_send, 1);
     uint32_t ts = TIM2->CNT;
     bool violation = 0;
@@ -165,6 +171,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
 
     if (current_controls_allowed) {
 
+      violation |= rolling_counter != expected_counter;
       // *** global torque limit check ***
       violation |= max_limit_check(desired_torque, GM_MAX_STEER, -GM_MAX_STEER);
 
@@ -185,6 +192,10 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
         gm_rt_torque_last = desired_torque;
         gm_ts_last = ts;
       }
+    }
+    else {
+      //switching to stock lkas when OP disabled
+      tx = 0;
     }
 
     // no torque if controls is not allowed
@@ -262,13 +273,25 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     bus_fwd = 2;  // Camera CAN
   }
   if (bus_num == 2) {
-    int addr = GET_ADDR(to_fwd);
-    //TODO: capture the rolling_counter value
-    //TODO: allow to use stock LKAS optionally
-    int block_msg = (addr == 384);
-    if (!block_msg) {
-      bus_fwd = 0;  // Main CAN
-    }
+      // disallow actuator commands if gas or brake (with vehicle moving) are pressed
+      // and the the latching controls_allowed flag is True
+      int pedal_pressed = gm_gas_prev || (gm_brake_prev && gm_moving);
+      bool current_controls_allowed = controls_allowed && !pedal_pressed;
+      int addr = GET_ADDR(to_fwd);
+      if (addr == 384) {
+        if (!current_controls_allowed) {
+          int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
+          int required_counter = (gm_lkas_counter_prev + 1) % 4;
+          if (lkas_counter == required_counter) {
+            bus_fwd = 0;
+            gm_lkas_counter_prev = lkas_counter;
+          }
+        }
+      }
+      else {
+        bus_fwd = 0;
+      }
+
   }
 
   // fallback to do not forward
