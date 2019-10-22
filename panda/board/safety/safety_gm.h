@@ -162,14 +162,16 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     vals[3] = 0x30000ffdU;
 
     int rolling_counter = (GET_BYTE(to_send, 0) & 0x3U) >> 4;
+    //TODO: critical section
     int expected_counter = (gm_lkas_counter_prev + 1) % 4;
-    gm_lkas_counter_prev = rolling_counter;
+    
     int desired_torque = ((GET_BYTE(to_send, 0) & 0x7U) << 8) + GET_BYTE(to_send, 1);
     uint32_t ts = TIM2->CNT;
     bool violation = 0;
     desired_torque = to_signed(desired_torque, 11);
 
     if (current_controls_allowed) {
+      gm_lkas_counter_prev = rolling_counter;
 
       violation |= rolling_counter != expected_counter;
       // *** global torque limit check ***
