@@ -1,4 +1,6 @@
 # distutils: language = c++
+#cython: language_level=3
+
 from libc.stdint cimport uint32_t, uint64_t, uint16_t
 from libcpp.vector cimport vector
 from libcpp.map cimport map
@@ -12,7 +14,9 @@ ctypedef enum SignalType:
   HONDA_COUNTER,
   TOYOTA_CHECKSUM,
   PEDAL_CHECKSUM,
-  PEDAL_COUNTER
+  PEDAL_COUNTER,
+  VOLKSWAGEN_CHECKSUM,
+  VOLKSWAGEN_COUNTER
 
 cdef struct Signal:
   const char* name
