@@ -288,25 +288,23 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     bus_fwd = 2;  // Camera CAN
   }
   if (bus_num == 2) {
-      // disallow actuator commands if gas or brake (with vehicle moving) are pressed
-      // and the the latching controls_allowed flag is True
-
       int addr = GET_ADDR(to_fwd);
-      if (addr == 384) {
-        int pedal_pressed = gm_gas_prev || (gm_brake_prev && gm_moving);
-        bool current_controls_allowed = controls_allowed && !pedal_pressed;
-        if (!current_controls_allowed) {
-          int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
-          int required_counter = (gm_lkas_counter_prev + 1) % 4;
-          if (lkas_counter == required_counter) {
-            bus_fwd = 0;
-            gm_lkas_counter_prev = lkas_counter;
-          }
+
+      if (addr != 384) return 0;
+
+
+      int pedal_pressed = gm_gas_prev || (gm_brake_prev && gm_moving);
+      bool current_controls_allowed = controls_allowed && !pedal_pressed;
+
+      if (!current_controls_allowed) {
+        int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
+        int required_counter = (gm_lkas_counter_prev + 1) % 4;
+        if (lkas_counter == required_counter) {
+          bus_fwd = 0;
+          gm_lkas_counter_prev = lkas_counter;
         }
       }
-      else {
-        bus_fwd = 0;
-      }
+
   }
 
   // fallback to do not forward
