@@ -164,7 +164,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
   // LKA STEER: safety check
   if (addr == 384) {
     if (!current_controls_allowed) {
-      tx = 0;
+      tx = 1;
       return tx;
       }
 

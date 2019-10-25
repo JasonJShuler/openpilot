@@ -121,8 +121,10 @@ class CarController():
         can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
           canbus, apply_steer, CS.v_ego, idx, lkas_enabled)
       else:
-        can_sends.append(gmcan.create_steering_control(self.packer_pt,
-          canbus.powertrain, apply_steer, idx, lkas_enabled))
+        #temp drop lkas when lkas inactive
+        if lkas_enabled:
+          can_sends.append(gmcan.create_steering_control(self.packer_pt,
+            canbus.powertrain, apply_steer, idx, lkas_enabled))
 
     ### GAS/BRAKE ###
 
