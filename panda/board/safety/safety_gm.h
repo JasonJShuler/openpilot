@@ -294,8 +294,15 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     if (addr != 384) return 0;
     if (!gm_stock_lkas)  return -1;
 
+    puts("stock lkas active");
+
     int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
+
+    char buffer[50];
+    sprintf(buffer, "lkas_counter: %d, required_counter: %d",lkas_counter,required_counter  );
+    puts(buffer);
+
     //TODO: find out if this even happens...
     if (lkas_counter == required_counter) {
       bus_fwd = 0;
