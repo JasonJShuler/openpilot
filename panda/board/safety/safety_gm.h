@@ -36,6 +36,7 @@ struct sample_t gm_torque_driver;         // last few driver torques measured
 
 static void gm_set_controlsallowed(bool val) {
   controls_allowed = val;
+  gm_stock_lkas = !val;
 }
 
 
@@ -163,7 +164,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
 
   // LKA STEER: safety check
   if (addr == 384) {
-    if (!current_controls_allowed) {
+    if (gm_stock_lkas) {
       tx = 1;
       return tx;
       }
@@ -288,23 +289,18 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     bus_fwd = 2;  // Camera CAN
   }
   if (bus_num == 2) {
-      int addr = GET_ADDR(to_fwd);
+    int addr = GET_ADDR(to_fwd);
 
-      if (addr != 384) return 0;
+    if (addr != 384) return 0;
+    if (!gm_stock_lkas)  return -1;
 
-
-      int pedal_pressed = gm_gas_prev || (gm_brake_prev && gm_moving);
-      bool current_controls_allowed = controls_allowed && !pedal_pressed;
-
-      if (!current_controls_allowed) {
-        int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
-        int required_counter = (gm_lkas_counter_prev + 1) % 4;
-        if (lkas_counter == required_counter) {
-          bus_fwd = 0;
-          gm_lkas_counter_prev = lkas_counter;
-        }
-      }
-
+    int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
+    int required_counter = (gm_lkas_counter_prev + 1) % 4;
+    //TODO: find out if this even happens...
+    if (lkas_counter == required_counter) {
+      bus_fwd = 0;
+      gm_lkas_counter_prev = lkas_counter;
+    }
   }
 
   // fallback to do not forward
