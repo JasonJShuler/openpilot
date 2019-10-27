@@ -178,21 +178,20 @@ class CarController():
           can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
           can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
 
-      if frame % P.ADAS_KEEPALIVE_STEP == 0:
-        can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
+        if frame % P.ADAS_KEEPALIVE_STEP == 0:
+          can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
       # Show green icon when LKA torque is applied, and
       # alarming orange icon when approaching torque limit.
       # If not sent again, LKA icon disappears in about 5 seconds.
       # Conveniently, sending camera message periodically also works as a keepalive.
       #TODO: camera keepaive may be different on Bolt
-      if lkas_enabled:
-        lka_active = CS.lkas_status == 1
-        lka_critical = lka_active and abs(actuators.steer) > 0.9
-        lka_icon_status = (lka_active, lka_critical)
-        if frame % P.CAMERA_KEEPALIVE_STEP == 0 \
-            or lka_icon_status != self.lka_icon_status_last:
-          can_sends.append(gmcan.create_lka_icon_command(canbus.sw_gmlan, lka_active, lka_critical, steer))
-          self.lka_icon_status_last = lka_icon_status
+      lka_active = CS.lkas_status == 1
+      lka_critical = lka_active and abs(actuators.steer) > 0.9
+      lka_icon_status = (lka_active, lka_critical)
+      if frame % P.CAMERA_KEEPALIVE_STEP == 0 \
+          or lka_icon_status != self.lka_icon_status_last:
+        can_sends.append(gmcan.create_lka_icon_command(canbus.sw_gmlan, lka_active, lka_critical, steer))
+        self.lka_icon_status_last = lka_icon_status
 
     return can_sends
