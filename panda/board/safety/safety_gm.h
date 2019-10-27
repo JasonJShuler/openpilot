@@ -1,3 +1,4 @@
+#include <stdio.h>
 // board enforces
 //   in-state
 //      accel set/resume
