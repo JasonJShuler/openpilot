@@ -301,17 +301,17 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
-    if (lkas_counter == 0) puts("lkas_counter: 0");
-    else if (lkas_counter == 1) puts("lkas_counter: 1");
-    else if (lkas_counter == 2) puts("lkas_counter: 2");
-    else if (lkas_counter == 3) puts("lkas_counter: 3");
-    else puts("lkas_counter off the reservation");
+    if (lkas_counter == 0) puts("lkas_counter: 0 ");
+    else if (lkas_counter == 1) puts("lkas_counter: 1 ");
+    else if (lkas_counter == 2) puts("lkas_counter: 2 ");
+    else if (lkas_counter == 3) puts("lkas_counter: 3 ");
+    else puts("lkas_counter off the reservation ");
 
-    if (required_counter == 0) puts("required_counter: 0");
-    else if (required_counter == 1) puts("required_counter: 1");
-    else if (required_counter == 2) puts("required_counter: 2");
-    else if (required_counter == 3) puts("required_counter: 3");
-    else puts("required_counter off the reservation");
+    if (required_counter == 0) puts("required_counter: 0\r\n");
+    else if (required_counter == 1) puts("required_counter: 1\r\n");
+    else if (required_counter == 2) puts("required_counter: 2\r\n");
+    else if (required_counter == 3) puts("required_counter: 3\r\n");
+    else puts("required_counter off the reservation\r\n");
     
     //TODO: find out if this even happens...
     if (lkas_counter == required_counter) {
