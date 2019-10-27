@@ -282,6 +282,8 @@ static void gm_passive_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   }
 }
 
+
+
 static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
 
   int bus_fwd = -1;
@@ -299,10 +301,18 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
-    char buffer[50];
-    ets_sprintf(buffer, "lkas_counter: %d, required_counter: %d",lkas_counter,required_counter  );
-    puts(buffer);
+    if (lkas_counter == 0) puts("lkas_counter: 0");
+    else if (lkas_counter == 1) puts("lkas_counter: 1");
+    else if (lkas_counter == 2) puts("lkas_counter: 2");
+    else if (lkas_counter == 3) puts("lkas_counter: 3");
+    else puts("lkas_counter off the reservation");
 
+    if (required_counter == 0) puts("required_counter: 0");
+    else if (required_counter == 1) puts("required_counter: 1");
+    else if (required_counter == 2) puts("required_counter: 2");
+    else if (required_counter == 3) puts("required_counter: 3");
+    else puts("required_counter off the reservation");
+    
     //TODO: find out if this even happens...
     if (lkas_counter == required_counter) {
       bus_fwd = 0;
