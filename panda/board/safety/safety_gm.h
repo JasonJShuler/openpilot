@@ -177,7 +177,6 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     vals[3] = 0x30000ffdU;
 
     int rolling_counter = GET_BYTE(to_send, 0) >> 4;
-    //TODO: critical section
     int expected_counter = (gm_lkas_counter_prev + 1) % 4;
     
     int desired_torque = ((GET_BYTE(to_send, 0) & 0x7U) << 8) + GET_BYTE(to_send, 1);
@@ -222,13 +221,13 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     }
 
     if (violation) {
-      //Replace payload with appropriate zero value for supplied rolling counter
-      to_send->RDHR = vals[rolling_counter];
+      //Replace payload with appropriate zero value for expected rolling counter
+      to_send->RDHR = vals[expected_counter];
       //tx = 0;
     }
 
     if (tx != 0) {
-      gm_lkas_counter_prev = rolling_counter;
+      gm_lkas_counter_prev = expected_counter;
     }
 
   }
@@ -296,24 +295,9 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     if (addr != 384) return 0;
     if (!gm_stock_lkas)  return -1;
 
-    puts("stock lkas active");
-
     int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
-    if (lkas_counter == 0) puts("lkas_counter: 0 ");
-    else if (lkas_counter == 1) puts("lkas_counter: 1 ");
-    else if (lkas_counter == 2) puts("lkas_counter: 2 ");
-    else if (lkas_counter == 3) puts("lkas_counter: 3 ");
-    else puts("lkas_counter off the reservation ");
-
-    if (required_counter == 0) puts("required_counter: 0\r\n");
-    else if (required_counter == 1) puts("required_counter: 1\r\n");
-    else if (required_counter == 2) puts("required_counter: 2\r\n");
-    else if (required_counter == 3) puts("required_counter: 3\r\n");
-    else puts("required_counter off the reservation\r\n");
-    
-    //TODO: find out if this even happens...
     if (lkas_counter == required_counter) {
       bus_fwd = 0;
       gm_lkas_counter_prev = lkas_counter;
