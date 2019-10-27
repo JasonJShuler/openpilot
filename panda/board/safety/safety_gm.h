@@ -20,7 +20,7 @@ const int GM_MAX_REGEN = 1404;
 const int GM_MAX_BRAKE = 350;
 
 int gm_lkas_counter_prev = 0;
-int gm_stock_lkas = 1;
+bool gm_stock_lkas = true;
 int gm_brake_prev = 0;
 int gm_gas_prev = 0;
 bool gm_moving = false;
