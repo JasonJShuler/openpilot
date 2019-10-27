@@ -1,4 +1,3 @@
-#include <stdio.h>
 // board enforces
 //   in-state
 //      accel set/resume
@@ -301,7 +300,7 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
     char buffer[50];
-    sprintf(buffer, "lkas_counter: %d, required_counter: %d",lkas_counter,required_counter  );
+    ets_sprintf(buffer, "lkas_counter: %d, required_counter: %d",lkas_counter,required_counter  );
     puts(buffer);
 
     //TODO: find out if this even happens...
