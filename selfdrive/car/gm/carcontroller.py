@@ -178,8 +178,8 @@ class CarController():
           can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
           can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
 
-        if frame % P.ADAS_KEEPALIVE_STEP == 0:
-          can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
+      if frame % P.ADAS_KEEPALIVE_STEP == 0:
+        can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
       # Show green icon when LKA torque is applied, and
       # alarming orange icon when approaching torque limit.
