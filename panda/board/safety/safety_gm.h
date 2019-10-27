@@ -176,7 +176,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     vals[2] = 0x20000ffeU;
     vals[3] = 0x30000ffdU;
 
-    int rolling_counter = (GET_BYTE(to_send, 0) & 0x3U) >> 4;
+    int rolling_counter = GET_BYTE(to_send, 0) >> 4;
     //TODO: critical section
     int expected_counter = (gm_lkas_counter_prev + 1) % 4;
     
@@ -298,7 +298,7 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
 
     puts("stock lkas active");
 
-    int lkas_counter = (GET_BYTE(to_fwd, 0) & 0x3U) >> 4;
+    int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
     if (lkas_counter == 0) puts("lkas_counter: 0 ");
