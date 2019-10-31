@@ -165,7 +165,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
   // LKA STEER: safety check
   if (addr == 384) {
     if (gm_stock_lkas) {
-      tx = 1;
+      tx = 0;
       return tx;
       }
 
@@ -298,6 +298,7 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
     int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
+    //skip messages until we line up with counter
     if (lkas_counter == required_counter) {
       bus_fwd = 0;
       gm_lkas_counter_prev = lkas_counter;
