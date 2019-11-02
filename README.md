@@ -65,7 +65,7 @@ Supported Cars
 | Buick<sup>3</sup>    | Regal 2018                 | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>6</sup>|
 | Chevrolet<sup>3</sup>| Malibu 2017                | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>6</sup>|
 | Chevrolet<sup>3</sup>| Volt 2017-18               | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>6</sup>|
-| Chevrolet<sup>3</sup>| Bolt 2019                  | Driver Confidence II | Yes     | No             | 0mph             | 7mph           | Custom<sup>8</sup>|
+| Chevrolet<sup>3</sup>| Bolt 2019                  | Driver Confidence II | Yes     | No             | 0mph             | 7mph           | Custom<sup>6</sup>|
 | Cadillac<sup>3</sup> | ATS 2018                   | Adaptive Cruise      | Yes     | Yes            | 0mph             | 7mph           | Custom<sup>6</sup>|
 | Chrysler             | Pacifica 2017-18           | Adaptive Cruise      | Yes     | Stock          | 0mph             | 9mph           | FCA               |
 | Chrysler             | Pacifica Hybrid 2017-18    | Adaptive Cruise      | Yes     | Stock          | 0mph             | 9mph           | FCA               |
