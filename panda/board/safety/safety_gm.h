@@ -19,8 +19,7 @@ const int GM_MAX_GAS = 3072;
 const int GM_MAX_REGEN = 1404;
 const int GM_MAX_BRAKE = 350;
 
-int gm_lkas_counter_prev = 0;
-bool gm_stock_lkas = true;
+//int gm_lkas_counter_prev = 0;
 int gm_brake_prev = 0;
 int gm_gas_prev = 0;
 bool gm_moving = false;
@@ -31,14 +30,6 @@ int gm_rt_torque_last = 0;
 int gm_desired_torque_last = 0;
 uint32_t gm_ts_last = 0;
 struct sample_t gm_torque_driver;         // last few driver torques measured
-
-
-
-static void gm_set_controlsallowed(bool val) {
-  controls_allowed = val;
-  gm_stock_lkas = !val;
-}
-
 
 
 static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
@@ -71,7 +62,7 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   // 715 = ASCMGasRegenCmd
   if ((bus_number == 0) && ((addr == 384) || (addr == 715))) {
     gm_ascm_detected = 1;
-    gm_set_controlsallowed(0);
+    controls_allowed = 0;
   }
 
   // ACC steering wheel buttons
@@ -80,10 +71,10 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     switch (button) {
       case 2:  // resume
       case 3:  // set
-        gm_set_controlsallowed(1);
+        controls_allowed = 1;
         break;
       case 6:  // cancel
-        gm_set_controlsallowed(0);
+        controls_allowed = 0;
         break;
       default:
         break;  // any other button is irrelevant
@@ -100,7 +91,7 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
       brake = 0;
     }
     if (brake && (!gm_brake_prev || gm_moving)) {
-       gm_set_controlsallowed(0);
+       controls_allowed = 0;
     }
     gm_brake_prev = brake;
   }
@@ -109,7 +100,7 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   if (addr == 417) {
     int gas = GET_BYTE(to_push, 6);
     if (gas && !gm_gas_prev && long_controls_allowed) {
-      gm_set_controlsallowed(0);
+      controls_allowed = 0;
     }
     gm_gas_prev = gas;
   }
@@ -118,7 +109,7 @@ static void gm_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   if (addr == 189) {
     bool regen = GET_BYTE(to_push, 0) & 0x20;
     if (regen) {
-      gm_set_controlsallowed(0);
+      controls_allowed = 0;
     }
   }
 }
@@ -164,10 +155,10 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
 
   // LKA STEER: safety check
   if (addr == 384) {
-    if (gm_stock_lkas) {
-      tx = 0;
-      return tx;
-      }
+    // if (lkas_source == 0) {
+    //   tx = 1;
+    //   return tx;
+    //   }
 
 
     uint32_t vals[4];
@@ -177,7 +168,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     vals[3] = 0x30000ffdU;
 
     int rolling_counter = GET_BYTE(to_send, 0) >> 4;
-    int expected_counter = (gm_lkas_counter_prev + 1) % 4;
+    //int expected_counter = (gm_lkas_counter_prev + 1) % 4;
     
     int desired_torque = ((GET_BYTE(to_send, 0) & 0x7U) << 8) + GET_BYTE(to_send, 1);
     uint32_t ts = TIM2->CNT;
@@ -185,7 +176,7 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     desired_torque = to_signed(desired_torque, 11);
 
     if (current_controls_allowed) {
-      violation |= rolling_counter != expected_counter;
+      //violation |= rolling_counter != expected_counter;
       // *** global torque limit check ***
       violation |= max_limit_check(desired_torque, GM_MAX_STEER, -GM_MAX_STEER);
 
@@ -222,13 +213,13 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
 
     if (violation) {
       //Replace payload with appropriate zero value for expected rolling counter
-      //to_send->RDHR = vals[expected_counter];
-      tx = 0;
+      to_send->RDHR = vals[rolling_counter];
+      //tx = 0;
     }
 
-    if (tx != 0) {
-      gm_lkas_counter_prev = expected_counter;
-    }
+    // if (tx != 0) {
+    //   gm_lkas_counter_prev = rolling_counter;
+    // }
 
   }
 
@@ -293,16 +284,17 @@ static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     int addr = GET_ADDR(to_fwd);
 
     if (addr != 384) return 0;
-    if (!gm_stock_lkas)  return -1;
+    //Only block LKAS messages
 
-    int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
-    int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
-    //skip messages until we line up with counter
-    if (lkas_counter == required_counter) {
-      bus_fwd = 0;
-      gm_lkas_counter_prev = lkas_counter;
-    }
+    // int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
+    // int required_counter = (gm_lkas_counter_prev + 1) % 4;
+
+    // //skip messages until we line up with counter
+    // if (lkas_counter == required_counter) {
+    //   bus_fwd = 0;
+    //   gm_lkas_counter_prev = lkas_counter;
+    // }
   }
 
   // fallback to do not forward

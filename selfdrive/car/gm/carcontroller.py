@@ -104,9 +104,6 @@ class CarController():
     
     if (frame % P.STEER_STEP) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
-      # Bolt may have a max limit on continuous LKAS activation
-      #if self.car_fingerprint == CAR.BOLT and (frame % P.DISABLE_STEER_STEP == 0):
-      #  lkas_enabled = False
 
       if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
@@ -121,10 +118,8 @@ class CarController():
         can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
           canbus, apply_steer, CS.v_ego, idx, lkas_enabled)
       else:
-        #temp drop lkas when lkas inactive
-        if lkas_enabled:
-          can_sends.append(gmcan.create_steering_control(self.packer_pt,
-            canbus.powertrain, apply_steer, idx, lkas_enabled))
+        can_sends.append(gmcan.create_steering_control(self.packer_pt,
+          canbus.powertrain, apply_steer, idx, lkas_enabled))
 
     ### GAS/BRAKE ###
 
