@@ -146,6 +146,10 @@ class CarController():
 
         at_full_stop = enabled and CS.standstill
         near_stop = enabled and (CS.v_ego < P.NEAR_STOP_BRAKE_PHASE)
+
+        #if self.car_fingerprint == CAR.BOLT:
+        #  can_sends.append(gmcan.create_fca_brake_command(self.packer_pt, canbus.powertrain, apply_brake, idx, near_stop, at_full_stop))
+        #else:
         can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, canbus.chassis, apply_brake, idx, near_stop, at_full_stop))
 
         at_full_stop = enabled and CS.standstill
