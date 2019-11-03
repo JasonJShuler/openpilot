@@ -176,9 +176,12 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     bool violation = 0;
     desired_torque = to_signed(desired_torque, 11);
 
+    //we must skip messages until we come around
+    //counter next is set when a message arrived too soon and had to be dropped
     if (gm_lkas_counter_next != -1) {
       if (rolling_counter != gm_lkas_counter_next) {
-        violation = true;
+        tx = 0;
+        return tx;
       }
       else {
         gm_lkas_counter_next = -1;
@@ -227,6 +230,8 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
       //tx = 0;
     }
 
+    //Check to see if this message has arrived too soon
+    //if so it must be dropped and the next counter value saved
     uint32_t ts_elapsed2 = get_ts_elapsed(ts, gm_ts_last);
     if (ts_elapsed2 < GM_RT_MIN_INTERVAL) {
       tx = 0;
