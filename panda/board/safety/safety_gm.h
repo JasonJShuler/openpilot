@@ -11,6 +11,7 @@
 const int GM_MAX_STEER = 300;
 const int GM_MAX_RT_DELTA = 128;          // max delta torque allowed for real time checks
 const uint32_t GM_RT_INTERVAL = 250000;    // 250ms between real time checks
+const uint32_t GM_RT_MIN_INTERVAL = 19000;    // 250ms between real time checks
 const int GM_MAX_RATE_UP = 7;
 const int GM_MAX_RATE_DOWN = 17;
 const int GM_DRIVER_TORQUE_ALLOWANCE = 50;
@@ -19,7 +20,7 @@ const int GM_MAX_GAS = 3072;
 const int GM_MAX_REGEN = 1404;
 const int GM_MAX_BRAKE = 350;
 
-//int gm_lkas_counter_prev = 0;
+int gm_lkas_counter_next = -1;
 int gm_brake_prev = 0;
 int gm_gas_prev = 0;
 bool gm_moving = false;
@@ -175,6 +176,15 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     bool violation = 0;
     desired_torque = to_signed(desired_torque, 11);
 
+    if (gm_lkas_counter_next != -1) {
+      if (rolling_counter != gm_lkas_counter_next) {
+        violation = true;
+      }
+      else {
+        gm_lkas_counter_next = -1;
+      }
+    }
+
     if (current_controls_allowed) {
       //violation |= rolling_counter != expected_counter;
       // *** global torque limit check ***
@@ -216,6 +226,13 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
       to_send->RDHR = vals[rolling_counter];
       //tx = 0;
     }
+
+    uint32_t ts_elapsed2 = get_ts_elapsed(ts, gm_ts_last);
+    if (ts_elapsed2 < GM_RT_MIN_INTERVAL) {
+      tx = 0;
+      gm_lkas_counter_next = rolling_counter;
+    }
+
 
     // if (tx != 0) {
     //   gm_lkas_counter_prev = rolling_counter;
