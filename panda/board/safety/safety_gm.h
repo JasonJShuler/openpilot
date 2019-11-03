@@ -296,32 +296,32 @@ static void gm_passive_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
 
 
 
-static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
+// static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
 
-  int bus_fwd = -1;
-  if (bus_num == 0) {
-    bus_fwd = 2;  // Camera CAN
-  }
-  if (bus_num == 2) {
-    int addr = GET_ADDR(to_fwd);
+//   int bus_fwd = -1;
+//   if (bus_num == 0) {
+//     bus_fwd = 2;  // Camera CAN
+//   }
+//   if (bus_num == 2) {
+//     int addr = GET_ADDR(to_fwd);
 
-    if (addr != 384) return 0;
-    //Only block LKAS messages
+//     if (addr != 384) return 0;
+//     //Only block LKAS messages
 
 
-    // int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
-    // int required_counter = (gm_lkas_counter_prev + 1) % 4;
+//     // int lkas_counter = GET_BYTE(to_fwd, 0) >> 4;
+//     // int required_counter = (gm_lkas_counter_prev + 1) % 4;
 
-    // //skip messages until we line up with counter
-    // if (lkas_counter == required_counter) {
-    //   bus_fwd = 0;
-    //   gm_lkas_counter_prev = lkas_counter;
-    // }
-  }
+//     // //skip messages until we line up with counter
+//     // if (lkas_counter == required_counter) {
+//     //   bus_fwd = 0;
+//     //   gm_lkas_counter_prev = lkas_counter;
+//     // }
+//   }
 
-  // fallback to do not forward
-  return bus_fwd;
-}
+//   // fallback to do not forward
+//   return bus_fwd;
+// }
 
 
 
