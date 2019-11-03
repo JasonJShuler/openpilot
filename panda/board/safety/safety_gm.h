@@ -11,7 +11,7 @@
 const int GM_MAX_STEER = 300;
 const int GM_MAX_RT_DELTA = 128;          // max delta torque allowed for real time checks
 const uint32_t GM_RT_INTERVAL = 250000;    // 250ms between real time checks
-const uint32_t GM_RT_MIN_INTERVAL = 19000;    // 250ms between real time checks
+//const uint32_t GM_RT_MIN_INTERVAL = 19000;    // 250ms between real time checks
 const int GM_MAX_RATE_UP = 7;
 const int GM_MAX_RATE_DOWN = 17;
 const int GM_DRIVER_TORQUE_ALLOWANCE = 50;
@@ -20,7 +20,7 @@ const int GM_MAX_GAS = 3072;
 const int GM_MAX_REGEN = 1404;
 const int GM_MAX_BRAKE = 350;
 
-int gm_lkas_counter_next = -1;
+//int gm_lkas_counter_next = -1;
 int gm_brake_prev = 0;
 int gm_gas_prev = 0;
 bool gm_moving = false;
@@ -176,17 +176,17 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
     bool violation = 0;
     desired_torque = to_signed(desired_torque, 11);
 
-    //we must skip messages until we come around
-    //counter next is set when a message arrived too soon and had to be dropped
-    if (gm_lkas_counter_next != -1) {
-      if (rolling_counter != gm_lkas_counter_next) {
-        tx = 0;
-        return tx;
-      }
-      else {
-        gm_lkas_counter_next = -1;
-      }
-    }
+    // //we must skip messages until we come around
+    // //counter next is set when a message arrived too soon and had to be dropped
+    // if (gm_lkas_counter_next != -1) {
+    //   if (rolling_counter != gm_lkas_counter_next) {
+    //     tx = 0;
+    //     return tx;
+    //   }
+    //   else {
+    //     gm_lkas_counter_next = -1;
+    //   }
+    // }
 
     if (current_controls_allowed) {
       //violation |= rolling_counter != expected_counter;
@@ -230,13 +230,13 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
       //tx = 0;
     }
 
-    //Check to see if this message has arrived too soon
-    //if so it must be dropped and the next counter value saved
-    uint32_t ts_elapsed2 = get_ts_elapsed(ts, gm_ts_last);
-    if (ts_elapsed2 < GM_RT_MIN_INTERVAL) {
-      tx = 0;
-      gm_lkas_counter_next = rolling_counter;
-    }
+    // //Check to see if this message has arrived too soon
+    // //if so it must be dropped and the next counter value saved
+    // uint32_t ts_elapsed2 = get_ts_elapsed(ts, gm_ts_last);
+    // if (ts_elapsed2 < GM_RT_MIN_INTERVAL) {
+    //   tx = 0;
+    //   gm_lkas_counter_next = rolling_counter;
+    // }
 
 
     // if (tx != 0) {
@@ -332,7 +332,7 @@ const safety_hooks gm_hooks = {
   .tx = gm_tx_hook,
   .tx_lin = nooutput_tx_lin_hook,
   .ignition = gm_ign_hook,
-  .fwd = gm_fwd_hook,
+  .fwd = default_fwd_hook,
 };
 
 const safety_hooks gm_passive_hooks = {
