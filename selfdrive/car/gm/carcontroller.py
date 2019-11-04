@@ -107,27 +107,30 @@ class CarController():
 
     ### STEER ###
     
-    if (frame % P.STEER_STEP) == 0:
-      myStep = P.STEER_STEP
+    lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
+    steer_step = P.STEER_STEP
+
+    if not lkas_enabled:
+      steer_step = P.STEER_STEP_INACTIVE
+
+    if (frame % steer_step) == 0:
       lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       # Steer command is slower while inactive
-      if lkas_enabled or (not lkas_enabled and frame % P.STEER_STEP_INACTIVE == 0):
-        if lkas_enabled:
-          apply_steer = actuators.steer * P.STEER_MAX
-          apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
-        else:
-          myStep = P.STEER_STEP_INACTIVE
-          apply_steer = 0
+      if lkas_enabled:
+        apply_steer = actuators.steer * P.STEER_MAX
+        apply_steer = apply_std_steer_torque_limits(apply_steer, self.apply_steer_last, CS.steer_torque_driver, P)
+      else:
+        apply_steer = 0
 
-        self.apply_steer_last = apply_steer
-        idx = (frame // myStep) % 4
+      self.apply_steer_last = apply_steer
+      idx = (frame // steer_step) % 4
 
-        if self.car_fingerprint in SUPERCRUISE_CARS:
-          can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
-            canbus, apply_steer, CS.v_ego, idx, lkas_enabled)
-        else:
-          can_sends.append(gmcan.create_steering_control(self.packer_pt,
-            canbus.powertrain, apply_steer, idx, lkas_enabled))
+      if self.car_fingerprint in SUPERCRUISE_CARS:
+        can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
+          canbus, apply_steer, CS.v_ego, idx, lkas_enabled)
+      else:
+        can_sends.append(gmcan.create_steering_control(self.packer_pt,
+          canbus.powertrain, apply_steer, idx, lkas_enabled))
 
     ### GAS/BRAKE ###
 
