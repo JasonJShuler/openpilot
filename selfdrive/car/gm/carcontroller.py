@@ -150,39 +150,36 @@ class CarController():
         at_full_stop = enabled and CS.standstill
         near_stop = enabled and (CS.v_ego < P.NEAR_STOP_BRAKE_PHASE)
 
-        #if self.car_fingerprint == CAR.BOLT:
-        #  can_sends.append(gmcan.create_fca_brake_command(self.packer_pt, canbus.powertrain, apply_brake, idx, near_stop, at_full_stop))
-        #else:
-        can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, canbus.chassis, apply_brake, idx, near_stop, at_full_stop))
+        if not self.car_fingerprint == CAR.BOLT:
 
-        at_full_stop = enabled and CS.standstill
-        can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, canbus.powertrain, apply_gas, idx, enabled, at_full_stop))
+          can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, canbus.chassis, apply_brake, idx, near_stop, at_full_stop))
+          at_full_stop = enabled and CS.standstill
+          can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, canbus.powertrain, apply_gas, idx, enabled, at_full_stop))
 
-      if not self.car_fingerprint == CAR.BOLT:
-        # Send dashboard UI commands (ACC status), 25hz
-        if (frame % 4) == 0:
-          can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, canbus.powertrain, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car))
+          # Send dashboard UI commands (ACC status), 25hz
+          if (frame % 4) == 0:
+            can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, canbus.powertrain, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car))
 
-      # Radar needs to know current speed and yaw rate (50hz),
-      # and that ADAS is alive (10hz)
-      time_and_headlights_step = 10
-      tt = frame * DT_CTRL
+          # Radar needs to know current speed and yaw rate (50hz),
+          # and that ADAS is alive (10hz)
+          time_and_headlights_step = 10
+          tt = frame * DT_CTRL
 
-      if not self.car_fingerprint == CAR.BOLT:
-        if frame % time_and_headlights_step == 0:
-          idx = (frame // time_and_headlights_step) % 4
-          can_sends.append(gmcan.create_adas_time_status(canbus.obstacle, int((tt - self.start_time) * 60), idx))
-          can_sends.append(gmcan.create_adas_headlights_status(canbus.obstacle))
+          if frame % time_and_headlights_step == 0:
+            idx = (frame // time_and_headlights_step) % 4
+            can_sends.append(gmcan.create_adas_time_status(canbus.obstacle, int((tt - self.start_time) * 60), idx))
+            can_sends.append(gmcan.create_adas_headlights_status(canbus.obstacle))
 
-        speed_and_accelerometer_step = 2
-        if frame % speed_and_accelerometer_step == 0:
-          idx = (frame // speed_and_accelerometer_step) % 4
-          can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
-          can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
+          speed_and_accelerometer_step = 2
+          if frame % speed_and_accelerometer_step == 0:
+            idx = (frame // speed_and_accelerometer_step) % 4
+            can_sends.append(gmcan.create_adas_steering_status(canbus.obstacle, idx))
+            can_sends.append(gmcan.create_adas_accelerometer_speed_status(canbus.obstacle, CS.v_ego, idx))
 
-        if frame % P.ADAS_KEEPALIVE_STEP == 0:
-          can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
+          if frame % P.ADAS_KEEPALIVE_STEP == 0:
+            can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
       else:
+        #  can_sends.append(gmcan.create_fca_brake_command(self.packer_pt, canbus.powertrain, apply_brake, idx, near_stop, at_full_stop))
         #Bolt specific camera keepalives
         if frame % P.ASCM_KEEPALIVE_STEP == 0:
           idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
