@@ -114,7 +114,7 @@ class CarController():
       steer_step = P.STEER_STEP_INACTIVE
 
     if (frame % steer_step) == 0:
-      lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
+      #lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       # Steer command is slower while inactive
       if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
