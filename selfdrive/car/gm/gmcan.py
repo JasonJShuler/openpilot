@@ -156,6 +156,31 @@ def create_adas_accelerometer_speed_status(bus, speed_ms, idx):
   dat += [(idx << 5) + (far_range_mode << 4) + (near_range_mode << 3) + (chksum >> 8), chksum & 0xff]
   return [0x308, 0, bytes(dat), bus]
 
+def create_ascm_2cd(bus, idx):
+  if idx == 0:
+    return [0x2cd, 0, b"\x00\x2c\x03\xd3\xfd", bus]
+  elif idx == 1:
+    return [0x2cd, 0, b"\x40\x2c\x03\xd3\xfc", bus]
+  elif idx == 2:
+    return [0x2cd, 0, b"\x80\x2c\x03\xd3\xfb", bus]
+  else:
+    return [0x2cd, 0, b"\xc0\x2c\x03\xd3\xfa", bus]
+
+
+def create_ascm_365(bus):
+  return [0x365, 0, b"\x80\x00\x30\xc0", bus]
+
+def create_fca_placeholder(bus, idx):
+  if idx == 0:
+    return [0x2cd, 0, b"\x00\x00\x00\x00\x00\x00", bus]
+  elif idx == 1:
+    return [0x2cd, 0, b"\x10\x00\x00\x0f\xff\xff", bus]
+  elif idx == 2:
+    return [0x2cd, 0, b"\x20\x00\x00\x0f\xff\xfe", bus]
+  else:
+    return [0x2cd, 0, b"\x30\x00\x00\x0f\xff\xfd", bus]
+
+
 def create_adas_headlights_status(bus):
   return [0x310, 0, b"\x42\x04", bus]
 

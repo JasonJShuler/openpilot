@@ -35,6 +35,9 @@ class CarControllerParams():
     # TODO: this is not working on Bolt
     self.ADAS_KEEPALIVE_STEP = 100
     self.CAMERA_KEEPALIVE_STEP = 100
+    self.ASCM_KEEPALIVE_STEP = 5
+    self.FCA_BRAKING_STEP = 10
+
 
     # pedal lookups, only for Volt
     MAX_GAS = 3072              # Only a safety limit
@@ -179,6 +182,20 @@ class CarController():
 
         if frame % P.ADAS_KEEPALIVE_STEP == 0:
           can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
+      else:
+        #Bolt specific camera keepalives
+        if frame % P.ASCM_KEEPALIVE_STEP == 0:
+          idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
+          can_sends += gmcan.create_ascm_2cd(canbus.powertrain,idx)
+          can_sends += gmcan.create_ascm_365(canbus.powertrain)
+        #temp placeholder for FCA Braking (keepalive only)
+        if frame % P.FCA_BRAKING_STEP == 0:
+          idx = (frame // P.FCA_BRAKING_STEP) % 4
+          can_sends += gmcan.create_fca_placeholder(canbus.powertrain,idx)
+
+
+
+
 
       # Show green icon when LKA torque is applied, and
       # alarming orange icon when approaching torque limit.
