@@ -172,13 +172,13 @@ def create_ascm_365(bus):
 
 def create_fca_placeholder(bus, idx):
   if idx == 0:
-    return [0x2cd, 0, b"\x00\x00\x00\x00\x00\x00", bus]
+    return [0x320, 0, b"\x00\x00\x00\x00\x00\x00", bus]
   elif idx == 1:
-    return [0x2cd, 0, b"\x10\x00\x00\x0f\xff\xff", bus]
+    return [0x320, 0, b"\x10\x00\x00\x0f\xff\xff", bus]
   elif idx == 2:
-    return [0x2cd, 0, b"\x20\x00\x00\x0f\xff\xfe", bus]
+    return [0x320, 0, b"\x20\x00\x00\x0f\xff\xfe", bus]
   else:
-    return [0x2cd, 0, b"\x30\x00\x00\x0f\xff\xfd", bus]
+    return [0x320, 0, b"\x30\x00\x00\x0f\xff\xfd", bus]
 
 
 def create_adas_headlights_status(bus):

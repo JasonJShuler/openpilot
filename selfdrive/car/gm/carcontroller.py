@@ -189,12 +189,12 @@ class CarController():
         #Bolt specific camera keepalives
         if frame % P.ASCM_KEEPALIVE_STEP == 0:
           idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
-          can_sends += gmcan.create_ascm_2cd(canbus.powertrain,idx)
-          can_sends += gmcan.create_ascm_365(canbus.powertrain)
+          can_sends.append(gmcan.create_ascm_2cd(canbus.powertrain,idx))
+          can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
         #temp placeholder for FCA Braking (keepalive only)
         if frame % P.FCA_BRAKING_STEP == 0:
           idx = (frame // P.FCA_BRAKING_STEP) % 4
-          can_sends += gmcan.create_fca_placeholder(canbus.powertrain,idx)
+          can_sends.append(gmcan.create_fca_placeholder(canbus.powertrain,idx))
 
 
 
