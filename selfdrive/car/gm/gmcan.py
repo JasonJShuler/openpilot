@@ -168,7 +168,7 @@ def create_ascm_2cd(bus, idx):
 
 
 def create_ascm_365(bus):
-  return [0x365, 0, b"\x80\x00\x30\xc0", bus]
+  return [0x365, 0, b"\x80\x00\x30\xe0", bus]
 
 def create_fca_placeholder(bus, idx):
   if idx == 0:
