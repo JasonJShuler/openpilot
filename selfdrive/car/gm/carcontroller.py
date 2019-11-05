@@ -4,7 +4,7 @@ from common.numpy_fast import interp
 from selfdrive.config import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.gm import gmcan
-from selfdrive.car.gm.values import DBC, SUPERCRUISE_CARS, CAR
+from selfdrive.car.gm.values import DBC, SUPERCRUISE_CARS, CAR, NO_ACC_CARS, NO_ASCM_CARS
 from selfdrive.can.packer import CANPacker
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -19,10 +19,17 @@ class CarControllerParams():
       self.STEER_DELTA_UP = 2          # 0.75s time to peak torque
       self.STEER_DELTA_DOWN = 5        # 0.3s from peak torque to zero
       self.MIN_STEER_SPEED = -1.       # can steer down to zero
-    else:
+    elif car_fingerprint in NO_ASCM_CARS:
       self.STEER_MAX = 300
       self.STEER_STEP = 2              # how often we update the steer cmd
       self.STEER_STEP_INACTIVE = 10    # how often we update the steer cmd
+      self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
+      self.STEER_DELTA_DOWN = 17       # ~0.3s from peak torque to zero
+      self.MIN_STEER_SPEED = 3.
+    else:
+      self.STEER_MAX = 300
+      self.STEER_STEP = 2              # how often we update the steer cmd
+      self.STEER_STEP_INACTIVE = 2     # how often we update the steer cmd
       self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
       self.STEER_DELTA_DOWN = 17       # ~0.3s from peak torque to zero
       self.MIN_STEER_SPEED = 3.
@@ -36,7 +43,7 @@ class CarControllerParams():
     # dashboard messages.
     self.ADAS_KEEPALIVE_STEP = 100
     self.CAMERA_KEEPALIVE_STEP = 100
-    #For Bolt
+    #For NO_ASCM_CARS
     self.ASCM_KEEPALIVE_STEP = 5
     self.FCA_BRAKING_STEP = 10
 
@@ -112,7 +119,6 @@ class CarController():
       steer_step = P.STEER_STEP_INACTIVE
 
     if (frame % steer_step) == 0:
-      #lkas_enabled = enabled and not CS.steer_not_allowed and CS.v_ego > P.MIN_STEER_SPEED
       # Steer command is slower while inactive
       if lkas_enabled:
         apply_steer = actuators.steer * P.STEER_MAX
@@ -152,7 +158,7 @@ class CarController():
         apply_brake = int(round(interp(final_pedal, P.BRAKE_LOOKUP_BP, P.BRAKE_LOOKUP_V)))
 
       #TODO: there may be other GM cars that lack ACC
-      if not self.car_fingerprint == CAR.BOLT:
+      if not self.car_fingerprint in NO_ASCM_CARS:
         # Gas/regen and brakes - all at 25Hz
         if (frame % 4) == 0:
           idx = (frame // 4) % 4
@@ -206,7 +212,6 @@ class CarController():
       # alarming orange icon when approaching torque limit.
       # If not sent again, LKA icon disappears in about 5 seconds.
       # Conveniently, sending camera message periodically also works as a keepalive.
-      #TODO: camera keepaive may be different on Bolt
       lka_active = CS.lkas_status == 1
       lka_critical = lka_active and abs(actuators.steer) > 0.9
       lka_icon_status = (lka_active, lka_critical)
