@@ -81,6 +81,7 @@ class CarController():
     self.apply_steer_last = 0
     self.car_fingerprint = car_fingerprint
     self.lka_icon_status_last = (False, False)
+    self.lkas_last_counter = 0
 
     # Setup detection helper. Routes commands to
     # an appropriate CAN bus number.
@@ -120,7 +121,9 @@ class CarController():
         apply_steer = 0
 
       self.apply_steer_last = apply_steer
-      idx = (frame // steer_step) % 4
+      idx = (self.lkas_last_counter + 1) % 4
+      #idx = (frame // steer_step) % 4
+      self.lkas_last_counter = idx
 
       if self.car_fingerprint in SUPERCRUISE_CARS:
         can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
@@ -184,17 +187,17 @@ class CarController():
         if frame % P.ADAS_KEEPALIVE_STEP == 0:
           can_sends += gmcan.create_adas_keepalive(canbus.powertrain)
 
-      else:
-        #  can_sends.append(gmcan.create_fca_brake_command(self.packer_pt, canbus.powertrain, apply_brake, idx, near_stop, at_full_stop))
-        #Bolt specific camera keepalives
-        if frame % P.ASCM_KEEPALIVE_STEP == 0:
-          idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
-          can_sends.append(gmcan.create_ascm_2cd(canbus.powertrain,idx))
-          can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
-        #temp placeholder for FCA Braking (keepalive only)
-        if frame % P.FCA_BRAKING_STEP == 0:
-          idx = (frame // P.FCA_BRAKING_STEP) % 4
-          can_sends.append(gmcan.create_fca_placeholder(canbus.powertrain,idx))
+      # else:
+      #   #  can_sends.append(gmcan.create_fca_brake_command(self.packer_pt, canbus.powertrain, apply_brake, idx, near_stop, at_full_stop))
+      #   #Bolt specific camera keepalives
+      #   if frame % P.ASCM_KEEPALIVE_STEP == 0:
+      #     idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
+      #     can_sends.append(gmcan.create_ascm_2cd(canbus.powertrain,idx))
+      #     can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
+      #   #temp placeholder for FCA Braking (keepalive only)
+      #   if frame % P.FCA_BRAKING_STEP == 0:
+      #     idx = (frame // P.FCA_BRAKING_STEP) % 4
+      #     can_sends.append(gmcan.create_fca_placeholder(canbus.powertrain,idx))
 
 
 
