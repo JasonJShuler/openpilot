@@ -156,6 +156,7 @@ def create_adas_accelerometer_speed_status(bus, speed_ms, idx):
   dat += [(idx << 5) + (far_range_mode << 4) + (near_range_mode << 3) + (chksum >> 8), chksum & 0xff]
   return [0x308, 0, bytes(dat), bus]
 
+#TODO: this sometimes has a different set of values
 def create_ascm_2cd(bus, idx):
   if idx == 0:
     return [0x2cd, 0, b"\x00\x2c\x03\xd3\xfd", bus]

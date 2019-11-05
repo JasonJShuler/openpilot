@@ -151,8 +151,8 @@ class CarController():
         apply_gas = int(round(interp(final_pedal, P.GAS_LOOKUP_BP, P.GAS_LOOKUP_V)))
         apply_brake = int(round(interp(final_pedal, P.BRAKE_LOOKUP_BP, P.BRAKE_LOOKUP_V)))
 
+      #TODO: there may be other GM cars that lack ACC
       if not self.car_fingerprint == CAR.BOLT:
-
         # Gas/regen and brakes - all at 25Hz
         if (frame % 4) == 0:
           idx = (frame // 4) % 4
