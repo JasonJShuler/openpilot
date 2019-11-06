@@ -157,15 +157,25 @@ def create_adas_accelerometer_speed_status(bus, speed_ms, idx):
   return [0x308, 0, bytes(dat), bus]
 
 #TODO: this sometimes has a different set of values
-def create_ascm_2cd(bus, idx):
-  if idx == 0:
-    return [0x2cd, 0, b"\x00\x2c\x03\xd3\xfd", bus]
-  elif idx == 1:
-    return [0x2cd, 0, b"\x40\x2c\x03\xd3\xfc", bus]
-  elif idx == 2:
-    return [0x2cd, 0, b"\x80\x2c\x03\xd3\xfb", bus]
+def create_ascm_2cd(bus, idx, initmode):
+  if initmode:
+    if idx == 0:
+      return [0x2cd, 0, b"\x00\x7f\xff\x80\x01", bus]
+    elif idx == 1:
+      return [0x2cd, 0, b"\x40\x7f\xff\x80\x00", bus]
+    elif idx == 2:
+      return [0x2cd, 0, b"\x80\x7f\xff\x7f\xff", bus]
+    else:
+      return [0x2cd, 0, b"\xc0\x7f\xff\x7f\xfe", bus]
   else:
-    return [0x2cd, 0, b"\xc0\x2c\x03\xd3\xfa", bus]
+    if idx == 0:
+      return [0x2cd, 0, b"\x00\x2c\x03\xd3\xfd", bus]
+    elif idx == 1:
+      return [0x2cd, 0, b"\x40\x2c\x03\xd3\xfc", bus]
+    elif idx == 2:
+      return [0x2cd, 0, b"\x80\x2c\x03\xd3\xfb", bus]
+    else:
+      return [0x2cd, 0, b"\xc0\x2c\x03\xd3\xfa", bus]
 
 
 def create_ascm_365(bus):

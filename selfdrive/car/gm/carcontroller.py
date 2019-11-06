@@ -197,7 +197,9 @@ class CarController():
         #Bolt specific camera keepalives
         if frame % P.ASCM_KEEPALIVE_STEP == 0:
           idx = (frame // P.ASCM_KEEPALIVE_STEP) % 4
-          can_sends.append(gmcan.create_ascm_2cd(canbus.powertrain,idx))
+          initPeriod = frame < 2000
+          #I wonder if the "init" phase is prior to ignition? or putting car in gear?
+          can_sends.append(gmcan.create_ascm_2cd(canbus.powertrain,idx, initPeriod))
           can_sends.append(gmcan.create_ascm_365(canbus.powertrain))
         #temp placeholder for FCA Braking (keepalive only)
         if frame % P.FCA_BRAKING_STEP == 0:
