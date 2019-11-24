@@ -343,7 +343,7 @@ void ignition_can_hook(CAN_FIFOMailBox_TypeDef *to_push) {
 
   if (bus == 0) {
     // GM exception
-    if ((addr == 0x1F1) && (len == 8)) {
+    if ((addr == 0x1F1)) {
       //Bit 5 is ignition "on"
       ignition_can = (GET_BYTE(to_push, 0) & 0x20) != 0;
     }
