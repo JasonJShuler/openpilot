@@ -347,6 +347,7 @@ void ignition_can_hook(CAN_FIFOMailBox_TypeDef *to_push) {
       //Bit 5 is ignition "on"
       ignition_can = (GET_BYTE(to_push, 0) & 0x20) != 0;
     }
+    //Suspect Bolt uses one of these addresses causing failed ignition detection
     // // Tesla exception
     // if ((addr == 0x348) && (len == 8)) {
     //   // GTW_status
