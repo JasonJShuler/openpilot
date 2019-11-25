@@ -55,6 +55,7 @@ bool MessageState::parse(uint64_t sec, uint16_t ts_, uint8_t * dat) {
       }
     } else if (sig.type == SignalType::VOLKSWAGEN_COUNTER) {
         if (!update_counter_generic(tmp, sig.b2)) {
+        INFO("0x%X CHECKSUM FAIL\n", address);
         return false;
       }
     } else if (sig.type == SignalType::PEDAL_CHECKSUM) {
@@ -83,7 +84,7 @@ bool MessageState::update_counter_generic(int64_t v, int cnt_size) {
   if (((old_counter+1) & ((1 << cnt_size) -1)) != v) {
     counter_fail += 1;
     if (counter_fail > 1) {
-      INFO("0x%X COUNTER FAIL %d -- %d vs %d\n", address, counter_fail, old_counter, (int)v);
+      INFO("%X COUNTER FAIL %d -- %d vs %d\n", address, counter_fail, old_counter, (int)v);
     }
     if (counter_fail >= MAX_BAD_COUNTER) {
       return false;
@@ -124,7 +125,7 @@ CANParser::CANParser(int abus, const std::string& dbc_name,
       }
     }
     if (!msg) {
-      fprintf(stderr, "CANParser: could not find message 0x%X in DBC %s\n", op.address, dbc_name.c_str());
+      fprintf(stderr, "CANParser: could not find message 0x%X in dnc %s\n", op.address, dbc_name.c_str());
       assert(false);
     }
 
@@ -192,7 +193,7 @@ void CANParser::UpdateValid(uint64_t sec) {
     const auto& state = kv.second;
     if (state.check_threshold > 0 && (sec - state.seen) > state.check_threshold) {
       if (state.seen > 0) {
-        DEBUG("0x%X TIMEOUT\n", state.address);
+        DEBUG("%X TIMEOUT\n", state.address);
       }
       can_valid = false;
     }

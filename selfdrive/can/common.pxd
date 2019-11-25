@@ -17,9 +17,7 @@ cdef extern from "common.h":
     HONDA_COUNTER,
     TOYOTA_CHECKSUM,
     PEDAL_CHECKSUM,
-    PEDAL_COUNTER,
-    VOLKSWAGEN_CHECKSUM,
-    VOLKSWAGEN_COUNTER
+    PEDAL_COUNTER
 
   cdef struct Signal:
     const char* name
