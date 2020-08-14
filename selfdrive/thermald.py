@@ -240,10 +240,10 @@ def thermald_thread():
     if max_cpu_temp > 107. or bat_temp >= 63.:
       # onroad not allowed
       thermal_status = ThermalStatus.danger
-    elif max_comp_temp > 92.5 or bat_temp > 60.: # CPU throttling starts around ~90C
+    elif max_comp_temp > 96.0 or bat_temp > 60.:
       # hysteresis between onroad not allowed and engage not allowed
       thermal_status = clip(thermal_status, ThermalStatus.red, ThermalStatus.danger)
-    elif max_cpu_temp > 87.5:
+    elif max_cpu_temp > 94.0:
       # hysteresis between engage not allowed and uploader not allowed
       thermal_status = clip(thermal_status, ThermalStatus.yellow, ThermalStatus.red)
     elif max_cpu_temp > 80.0:
@@ -259,7 +259,7 @@ def thermald_thread():
     # **** starting logic ****
 
     # Check for last update time and display alerts if needed
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
 
     # show invalid date/time alert
     time_valid = now.year >= 2019
