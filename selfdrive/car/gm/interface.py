@@ -177,9 +177,9 @@ class CarInterface(CarInterfaceBase):
           be.type = ButtonType.accelCruise # Suppress resume button if we're resuming from stop so we don't adjust speed.
       elif but == CruiseButtons.DECEL_SET:
         be.type = ButtonType.decelCruise
-      elif but == CruiseButtons.CANCEL:
-        if not ret.enableGasInterceptor: #need to use cancel to disable cc with Pedal
-          be.type = ButtonType.cancel
+      # elif but == CruiseButtons.CANCEL:
+      #   if not ret.enableGasInterceptor: #need to use cancel to disable cc with Pedal
+      #     be.type = ButtonType.cancel
       elif but == CruiseButtons.MAIN:
         be.type = ButtonType.altButton3
       buttonEvents.append(be)
@@ -201,9 +201,9 @@ class CarInterface(CarInterfaceBase):
       if self.CS.park_brake:
         events.append(create_event('parkBrake', [ET.NO_ENTRY, ET.USER_DISABLE]))
       # disable on pedals rising edge or when brake is pressed and speed isn't zero
-      if (ret.gasPressed and not self.gas_pressed_prev and not ret.enableGasInterceptor) or \
-        (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
-        events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
+      # if (ret.gasPressed and not self.gas_pressed_prev) or \
+      #   (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
+      #   events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
       if ret.cruiseState.standstill:
         events.append(create_event('resumeRequired', [ET.WARNING]))
       if not self.CS.car_fingerprint in NO_ASCM_CARS:
