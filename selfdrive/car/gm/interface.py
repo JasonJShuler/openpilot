@@ -73,12 +73,12 @@ class CarInterface(CarInterfaceBase):
       # actuatoreffectiveness is how much it steers. Lower values == more steering
       # outer and inner are gains. Higher values = more steering
       #
-      ret.steerActuatorDelay = 0.5
+      ret.steerActuatorDelay = 0.28
       ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGain = 5.0
-      ret.lateralTuning.indi.outerLoopGain = 4.2
-      ret.lateralTuning.indi.timeConstant = 1.8
-      ret.lateralTuning.indi.actuatorEffectiveness = 2.0
+      ret.lateralTuning.indi.innerLoopGain = 4.0
+      ret.lateralTuning.indi.outerLoopGain = 14.5
+      ret.lateralTuning.indi.timeConstant = 15.0
+      ret.lateralTuning.indi.actuatorEffectiveness = 5.9
 
       tire_stiffness_factor = 1.0
 
