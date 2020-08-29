@@ -174,7 +174,8 @@ class CarInterface(CarInterfaceBase):
 
     buttonEvents = []
     
-    no_pedal = not hasattr(ret,'enableGasInterceptor') or (hasattr(ret,'enableGasInterceptor') and not ret.enableGasInterceptor)
+    no_pedal = 0x201 not in ret.carFingerprint[0]
+    # no_pedal = not hasattr(ret,'enableGasInterceptor') or (hasattr(ret,'enableGasInterceptor') and not ret.enableGasInterceptor)
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons and self.CS.prev_cruise_buttons != CruiseButtons.INIT:
       be = car.CarState.ButtonEvent.new_message()
       be.type = ButtonType.unknown
