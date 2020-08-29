@@ -174,8 +174,6 @@ class CarInterface(CarInterfaceBase):
 
     buttonEvents = []
     
-    no_pedal = 0x201 not in ret.carFingerprint[0]
-    # no_pedal = not hasattr(ret,'enableGasInterceptor') or (hasattr(ret,'enableGasInterceptor') and not ret.enableGasInterceptor)
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons and self.CS.prev_cruise_buttons != CruiseButtons.INIT:
       be = car.CarState.ButtonEvent.new_message()
       be.type = ButtonType.unknown
@@ -191,7 +189,7 @@ class CarInterface(CarInterfaceBase):
       elif but == CruiseButtons.DECEL_SET:
         be.type = ButtonType.decelCruise
       elif but == CruiseButtons.CANCEL:
-        if no_pedal: #need to use cancel to disable cc with Pedal
+        if not self.CP.enableGasInterceptor: #need to use cancel to disable cc with Pedal
           be.type = ButtonType.cancel
       elif but == CruiseButtons.MAIN:
         be.type = ButtonType.altButton3
@@ -214,7 +212,7 @@ class CarInterface(CarInterfaceBase):
       if self.CS.park_brake:
         events.append(create_event('parkBrake', [ET.NO_ENTRY, ET.USER_DISABLE]))
       # disable on pedals rising edge or when brake is pressed and speed isn't zero
-      if (ret.gasPressed and not self.gas_pressed_prev and no_pedal) or \
+      if (ret.gasPressed and not self.gas_pressed_prev and not self.CP.enableGasInterceptor) or \
         (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
         events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
       if ret.cruiseState.standstill:
