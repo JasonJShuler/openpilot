@@ -62,9 +62,6 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 18.0
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.4 # wild guess
-      #ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.,41.0], [0.,41.0]]
-      #ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.1,0.24], [0.01,0.019]]
-      #ret.lateralTuning.pid.kf = 0.000038
 
       #-----------------------------------------------------------------------------
       # INDI
@@ -73,12 +70,12 @@ class CarInterface(CarInterfaceBase):
       # actuatoreffectiveness is how much it steers. Lower values == more steering
       # outer and inner are gains. Higher values = more steering
       #
-      ret.steerActuatorDelay = 0.28
+      ret.steerActuatorDelay = 0.15
       ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGain = 4.0
-      ret.lateralTuning.indi.outerLoopGain = 14.5
-      ret.lateralTuning.indi.timeConstant = 15.0
-      ret.lateralTuning.indi.actuatorEffectiveness = 5.9
+      ret.lateralTuning.indi.innerLoopGain = 4.2
+      ret.lateralTuning.indi.outerLoopGain = 12.7
+      ret.lateralTuning.indi.timeConstant = 5.0
+      ret.lateralTuning.indi.actuatorEffectiveness = 6.5
 
       tire_stiffness_factor = 1.0
 
