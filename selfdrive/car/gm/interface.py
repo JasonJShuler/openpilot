@@ -21,10 +21,17 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "gm"
     ret.safetyModel = car.CarParams.SafetyModel.gm
     ret.enableCruise = False  # stock cruise control is kept off
+    ret.enableGasInterceptor = 0x201 in fingerprint[0]
+    if ret.enableGasInterceptor:
+      ret.radarOffCan = False
 
     # GM port is a community feature
     # TODO: make a port that uses a car harness and it only intercepts the camera
     ret.communityFeature = True
+
+    #TODO detect, maybe based on fingerprint, if ASCM or not
+    #Detect AEB capability
+    #Detect 
 
     # Presence of a camera on the object bus is ok.
     # Have to go to read_only if ASCM is online (ACC-enabled cars),
@@ -92,6 +99,34 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.49
 
+    elif candidate == CAR.BOLT:
+      ret.minEnableSpeed = 25 * CV.MPH_TO_MS
+      if ret.enableGasInterceptor:
+        ret.minEnableSpeed = 5 * CV.MPH_TO_MS #steering works down to 5mph; pedal to 0
+      ret.mass = 1616. + STD_CARGO_KG
+      ret.wheelbase = 2.60096
+      ret.steerRatio = 16.8
+      ret.steerRatioRear = 0.
+      ret.centerToFront = 2.0828 #ret.wheelbase * 0.4 # wild guess
+
+    elif candidate == CAR.EQUINOX:
+      ret.minEnableSpeed = 18 * CV.MPH_TO_MS
+      ret.mass = 3500. * CV.LB_TO_KG + STD_CARGO_KG # (3849+3708)/2
+      ret.safetyModel = car.CarParams.SafetyModel.gm
+      ret.wheelbase = 2.72 #107.3 inches in meters
+      ret.steerRatio = 14.4 # guess for tourx
+      ret.steerRatioRear = 0. # unknown online
+      ret.centerToFront = ret.wheelbase * 0.4 # wild guess
+
+    elif candidate == CAR.TAHOE:
+      ret.minEnableSpeed = 18 * CV.MPH_TO_MS
+      ret.mass = 5602. * CV.LB_TO_KG + STD_CARGO_KG # (3849+3708)/2
+      ret.safetyModel = car.CarParams.SafetyModel.gm
+      ret.wheelbase = 2.95 #116 inches in meters
+      ret.steerRatio = 17.3 # guess for tourx
+      ret.steerRatioRear = 0. # unknown online
+      ret.centerToFront = 2.59  # ret.wheelbase * 0.4 # wild guess
+
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
     ret.rotationalInertia = scale_rot_inertia(ret.mass, ret.wheelbase)
@@ -155,8 +190,10 @@ class CarInterface(CarInterfaceBase):
       events.add(EventName.parkBrake)
     if ret.cruiseState.standstill:
       events.add(EventName.resumeRequired)
-    if self.CS.pcm_acc_status == AccState.FAULTED:
-      events.add(EventName.controlsFailed)
+    # This only applies to cars with ACC
+    # TODO: id cars without ACC and make conditional  
+    # if self.CS.pcm_acc_status == AccState.FAULTED:
+    #   events.add(EventName.controlsFailed)
     if ret.vEgo < self.CP.minSteerSpeed:
       events.add(car.CarEvent.EventName.belowSteerSpeed)
 
