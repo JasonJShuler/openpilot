@@ -81,9 +81,10 @@ class CarState(CarStateBase):
       self.pcm_acc_status = int(pt_cp.vl["ASCMActiveCruiseControlStatus"]['ACCCmdActive'])
     else:
       self.park_brake = pt_cp.vl["EPBStatus"]['EPBClosed']
-      ret.cruiseState.available = bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
       if self.CP.enableGasInterceptor:
-        ret.cruiseState.available = False
+        ret.cruiseState.available = not bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
+      else:
+        ret.cruiseState.available = bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
       ret.espDisabled = pt_cp.vl["ESPStatus"]['TractionControlOn'] != 1
       self.pcm_acc_status = pt_cp.vl["AcceleratorPedal2"]['CruiseState']
       if self.car_fingerprint == CAR.VOLT or self.car_fingerprint == CAR.BOLT:
