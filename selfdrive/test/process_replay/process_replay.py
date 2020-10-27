@@ -221,12 +221,12 @@ CONFIGS = [
     pub_sub={
       "can": ["controlsState", "carState", "carControl", "sendcan", "carEvents", "carParams"],
       "thermal": [], "health": [], "liveCalibration": [], "dMonitoringState": [], "plan": [], "pathPlan": [], "gpsLocation": [], "liveLocationKalman": [],
-      "model": [], "frame": [],
+      "model": [], "frontFrame": [],
     },
     ignore=["logMonoTime", "valid", "controlsState.startMonoTime", "controlsState.cumLagMs"],
     init_callback=fingerprint,
     should_recv_callback=None,
-    tolerance=None,
+    tolerance=NUMPY_TOLERANCE,
   ),
   ProcessConfig(
     proc_name="radard",

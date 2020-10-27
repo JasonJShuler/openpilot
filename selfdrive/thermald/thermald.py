@@ -13,7 +13,7 @@ from cereal import log
 from common.filter_simple import FirstOrderFilter
 from common.hardware import EON, HARDWARE, TICI
 from common.numpy_fast import clip, interp
-from common.params import Params, put_nonblocking
+from common.params import Params
 from common.realtime import DT_TRML, sec_since_boot
 from selfdrive.controls.lib.alertmanager import set_offroad_alert
 from selfdrive.loggerd.config import get_available_percent
@@ -180,6 +180,7 @@ def thermald_thread():
   startup_conditions = {
     "ignition": False,
   }
+  startup_conditions_prev = startup_conditions.copy()
 
   off_ts = None
   started_ts = None
@@ -376,10 +377,10 @@ def thermald_thread():
         started_seen = True
         os.system('echo performance > /sys/class/devfreq/soc:qcom,cpubw/governor')
     else:
-      if startup_conditions["ignition"]:
+      if startup_conditions["ignition"] and (startup_conditions != startup_conditions_prev):
         cloudlog.event("Startup blocked", startup_conditions=startup_conditions)
       if should_start_prev or (count == 0):
-        put_nonblocking("IsOffroad", "1")
+        params.put("IsOffroad", "1")
 
       started_ts = None
       if off_ts is None:
@@ -411,6 +412,7 @@ def thermald_thread():
     set_offroad_alert_if_changed("Offroad_ChargeDisabled", (not usb_power))
 
     should_start_prev = should_start
+    startup_conditions_prev = startup_conditions.copy()
 
     # report to server once per minute
     if (count % int(60. / DT_TRML)) == 0:

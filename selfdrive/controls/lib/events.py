@@ -252,6 +252,14 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., 15.),
   },
 
+  EventName.startupGreyPanda: {
+    ET.PERMANENT: Alert(
+      "WARNING: Grey panda is deprecated",
+      "Upgrade to comma two or black panda",
+      AlertStatus.userPrompt, AlertSize.mid,
+      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., 15.),
+  },
+
   EventName.invalidGiraffeToyota: {
     ET.PERMANENT: Alert(
       "Unsupported Giraffe Configuration",
@@ -470,6 +478,10 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
 
   EventName.fanMalfunction: {
     ET.PERMANENT: NormalPermanentAlert("Fan Malfunction", "Contact Support"),
+  },
+
+  EventName.cameraMalfunction: {
+    ET.PERMANENT: NormalPermanentAlert("Camera Malfunction", "Contact Support"),
   },
 
   # ********** events that affect controls state transitions **********
@@ -739,7 +751,7 @@ EVENTS: Dict[int, Dict[str, Union[Alert, Callable[[Any, messaging.SubMaster, boo
       "Speed Too High",
       "Slow down to resume operation",
       AlertStatus.normal, AlertSize.mid,
-      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.chimeWarning2Repeat, 2.2, 3., 4.),
+      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.none, 2.2, 3., 4.),
     ET.NO_ENTRY: Alert(
       "Speed Too High",
       "Slow down to engage",
