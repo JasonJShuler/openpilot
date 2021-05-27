@@ -345,7 +345,7 @@ def cleanup_all_processes(signal, frame):
 
 # ****************** run loop ******************
 
-def manager_init(should_register=True):
+def manager_init(should_register=False):
   if should_register:
     reg_res = register()
     if reg_res:
@@ -480,7 +480,7 @@ def main():
   params.manager_start()
 
   default_params = [
-    ("CommunityFeaturesToggle", "0"),
+    ("CommunityFeaturesToggle", "1"),
     ("CompletedTrainingVersion", "0"),
     ("IsMetric", "0"),
     ("RecordFront", "0"),
