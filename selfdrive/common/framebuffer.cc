@@ -1,5 +1,6 @@
+#include "framebuffer.h"
+#include "util.h"
 #include <cstdio>
-#include <cstdlib>
 #include <cassert>
 
 #include <ui/DisplayInfo.h>
@@ -12,8 +13,7 @@
 #include <GLES2/gl2.h>
 #include <EGL/eglext.h>
 
-#define BACKLIGHT_CONTROL "/sys/class/leds/lcd-backlight/brightness"
-#define BACKLIGHT_LEVEL "205"
+#define BACKLIGHT_LEVEL 205
 
 using namespace android;
 
@@ -32,17 +32,26 @@ struct FramebufferState {
     EGLContext context;
 };
 
-extern "C" void framebuffer_set_power(FramebufferState *s, int mode) {
+void FrameBuffer::swap() {
+  eglSwapBuffers(s->display, s->surface);
+  assert(glGetError() == GL_NO_ERROR);
+}
+
+bool set_brightness(int brightness) {
+  char bright[64];
+  snprintf(bright, sizeof(bright), "%d", brightness);
+  return 0 == write_file("/sys/class/leds/lcd-backlight/brightness", bright, strlen(bright));
+}
+
+void FrameBuffer::set_power(int mode) {
   SurfaceComposerClient::setDisplayPowerMode(s->dtoken, mode);
 }
 
-extern "C" FramebufferState* framebuffer_init(
-    const char* name, int32_t layer, int alpha,
-    int *out_w, int *out_h) {
+FrameBuffer::FrameBuffer(const char *name, uint32_t layer, int alpha, int *out_w, int *out_h) {
   status_t status;
   int success;
 
-  FramebufferState *s = new FramebufferState;
+  s = new FramebufferState;
 
   s->session = new SurfaceComposerClient();
   assert(s->session != NULL);
@@ -88,6 +97,9 @@ extern "C" FramebufferState* framebuffer_init(
     EGL_DEPTH_SIZE,   0,
     EGL_STENCIL_SIZE, 8,
     EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
+    // enable MSAA
+    EGL_SAMPLE_BUFFERS, 1,
+    EGL_SAMPLES, 4,
     EGL_NONE,
   };
 
@@ -98,7 +110,7 @@ extern "C" FramebufferState* framebuffer_init(
   assert(success);
 
   printf("egl version %d.%d\n", s->egl_major, s->egl_minor);
-  
+
   EGLint num_configs;
   success = eglChooseConfig(s->display, attribs, &s->config, 1, &num_configs);
   assert(success);
@@ -123,20 +135,15 @@ extern "C" FramebufferState* framebuffer_init(
 
   printf("gl version %s\n", glGetString(GL_VERSION));
 
-
-  // set brightness
-  int brightness_fd = open(BACKLIGHT_CONTROL, O_RDWR);
-  const char brightness_level[] = BACKLIGHT_LEVEL;
-  write(brightness_fd, brightness_level, strlen(brightness_level));
+  set_brightness(BACKLIGHT_LEVEL);
 
   if (out_w) *out_w = w;
   if (out_h) *out_h = h;
-
-  return s;
 }
 
-extern "C" void framebuffer_swap(FramebufferState *s) {
-  eglSwapBuffers(s->display, s->surface);
-  assert(glGetError() == GL_NO_ERROR);
+FrameBuffer::~FrameBuffer() {
+  eglDestroyContext(s->display, s->context);
+  eglDestroySurface(s->display, s->surface);
+  eglTerminate(s->display);
+  delete s;
 }
-

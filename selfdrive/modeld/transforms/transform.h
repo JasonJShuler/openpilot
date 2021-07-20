@@ -1,9 +1,9 @@
-#ifndef TRANSFORM_H
-#define TRANSFORM_H
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
 
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
 #else
@@ -11,10 +11,6 @@
 #endif
 
 #include "common/mat.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct {
   cl_kernel krnl;
@@ -30,9 +26,3 @@ void transform_queue(Transform* s, cl_command_queue q,
                      cl_mem out_y, cl_mem out_u, cl_mem out_v,
                      int out_width, int out_height,
                      mat3 projection);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif  // TRANSFORM_H

@@ -4,53 +4,10 @@ from common.numpy_fast import interp, clip
 from selfdrive.config import Conversions as CV
 from selfdrive.car import apply_std_steer_torque_limits, create_gas_command
 from selfdrive.car.gm import gmcan
-from selfdrive.car.gm.values import DBC, SUPERCRUISE_CARS, NO_ASCM_CARS, CanBus
+from selfdrive.car.gm.values import DBC, CanBus, CarControllerParams, REGEN_CARS
 from opendbc.can.packer import CANPacker
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
-
-
-class CarControllerParams():
-  def __init__(self, car_fingerprint):
-    if car_fingerprint in SUPERCRUISE_CARS:
-      self.STEER_MAX = 150
-      self.STEER_STEP = 1              # how often we update the steer cmd
-      self.STEER_DELTA_UP = 2          # 0.75s time to peak torque
-      self.STEER_DELTA_DOWN = 5        # 0.3s from peak torque to zero
-      self.MIN_STEER_SPEED = -1.       # can steer down to zero
-    elif car_fingerprint in NO_ASCM_CARS:
-      self.STEER_MAX = 300
-      self.STEER_STEP = 1              # how often we update the steer cmd
-      self.STEER_DELTA_UP = 3          # ~0.75s time to peak torque (255/50hz/0.75s)
-      self.STEER_DELTA_DOWN = 7       # ~0.3s from peak torque to zero
-      self.MIN_STEER_SPEED = 3.
-    else:
-      self.STEER_MAX = 300
-      self.STEER_STEP = 2              # how often we update the steer cmd
-      self.STEER_DELTA_UP = 7          # ~0.75s time to peak torque (255/50hz/0.75s)
-      self.STEER_DELTA_DOWN = 17       # ~0.3s from peak torque to zero
-      self.MIN_STEER_SPEED = 3.
-
-    self.STEER_DRIVER_ALLOWANCE = 50   # allowed driver torque before start limiting
-    self.STEER_DRIVER_MULTIPLIER = 4   # weight driver torque heavily
-    self.STEER_DRIVER_FACTOR = 100     # from dbc
-    self.NEAR_STOP_BRAKE_PHASE = 0.5 # m/s, more aggressive braking near full stop
-
-    # Takes case of "Service Adaptive Cruise" and "Service Front Camera"
-    # dashboard messages.
-    self.ADAS_KEEPALIVE_STEP = 100
-    self.CAMERA_KEEPALIVE_STEP = 100
-
-    # pedal lookups, only for Volt
-    MAX_GAS = 3072              # Only a safety limit
-    ZERO_GAS = 2048
-    MAX_BRAKE = 350             # Should be around 3.5m/s^2, including regen
-    self.MAX_ACC_REGEN = 1404  # ACC Regen braking is slightly less powerful than max regen paddle
-    self.GAS_LOOKUP_BP = [-0.25, 0., 0.5]
-    self.GAS_LOOKUP_V = [self.MAX_ACC_REGEN, ZERO_GAS, MAX_GAS]
-    self.BRAKE_LOOKUP_BP = [-1., -0.25]
-    self.BRAKE_LOOKUP_V = [MAX_BRAKE, 0]
-
 
 def actuator_hystereses(final_pedal, pedal_steady):
   # hyst params... TODO: move these to VehicleParams
@@ -67,28 +24,23 @@ def actuator_hystereses(final_pedal, pedal_steady):
 
   return final_pedal, pedal_steady
 
-def process_hud_alert(hud_alert):
-  # initialize to no alert
-  steer = 0
-  if hud_alert == VisualAlert.steerRequired:
-    steer = 1
-  return steer
-
+last_logged_pedal = 0.0
 class CarController():
   def __init__(self, dbc_name, CP, VM):
     self.pedal_steady = 0.
     self.start_time = 0.
     self.apply_steer_last = 0
-    self.car_fingerprint = CP.carFingerprint
     self.lka_icon_status_last = (False, False)
     self.steer_rate_limited = False
+    self.car_fingerprint = CP.carFingerprint
 
-    self.params = CarControllerParams(CP.carFingerprint)
+    self.params = CarControllerParams()
 
     self.packer_pt = CANPacker(DBC[CP.carFingerprint]['pt'])
+    self.packer_obj = CANPacker(DBC[CP.carFingerprint]['radar'])
     self.packer_ch = CANPacker(DBC[CP.carFingerprint]['chassis'])
 
-  def update(self, enabled, CS, frame, actuators, \
+  def update(self, enabled, CS, frame, actuators,
              hud_v_cruise, hud_show_lanes, hud_show_car, hud_alert):
 
     P = self.params
@@ -96,13 +48,9 @@ class CarController():
     # Send CAN commands.
     can_sends = []
 
-    alert_out = process_hud_alert(hud_alert)
-    steer = alert_out
-
-    ### STEER ###
-
+    # STEER
+    lkas_enabled = enabled and not CS.out.steerWarning and CS.out.vEgo > P.MIN_STEER_SPEED
     if (frame % P.STEER_STEP) == 0:
-      lkas_enabled = enabled and not CS.steer_not_allowed and CS.out.vEgo > P.MIN_STEER_SPEED
       if lkas_enabled:
         new_steer = actuators.steer * P.STEER_MAX
         apply_steer = apply_std_steer_torque_limits(new_steer, self.apply_steer_last, CS.out.steeringTorque, P)
@@ -113,92 +61,72 @@ class CarController():
       self.apply_steer_last = apply_steer
       idx = (frame // P.STEER_STEP) % 4
 
-      if self.car_fingerprint in SUPERCRUISE_CARS:
-        can_sends += gmcan.create_steering_control_ct6(self.packer_pt,
-          CanBus, apply_steer, CS.out.vEgo, idx, lkas_enabled)
-      else:
-        can_sends.append(gmcan.create_steering_control(self.packer_pt,
-          CanBus.POWERTRAIN, apply_steer, idx, lkas_enabled))
+      can_sends.append(gmcan.create_steering_control(self.packer_pt, CanBus.POWERTRAIN, apply_steer, idx, lkas_enabled))
 
     ### GAS/BRAKE ###
-    if self.car_fingerprint not in SUPERCRUISE_CARS:
-      # no output if not enabled, but keep sending keepalive messages
-      # treat pedals as one
-      final_pedal = actuators.gas - actuators.brake
-
-      # *** apply pedal hysteresis ***
-      final_brake, self.brake_steady = actuator_hystereses(
-        final_pedal, self.pedal_steady)
-      
+    # no output if not enabled, but keep sending keepalive messages
+    # treat pedals as one
+    
+    if CS.CP.enableGasInterceptor and self.car_fingerprint in REGEN_CARS:
+      #It seems in L mode, accel / decel point is around 1/5
+      #-1-------AEB------0----regen---0.15-------accel----------+1
+      # Shrink gas request to 0.85, have it start at 0.2
+      # Shrink brake request to 0.85, first 0.15 gives regen, rest gives AEB
+      zero = 40/256
+      gas = (1-zero) * actuators.gas + zero
+      regen = clip(actuators.brake, 0., zero) # Make brake the same size as gas, but clip to regen
+      # aeb = actuators.brake*(1-zero)-regen # For use later, braking more than regen
+      final_pedal = gas - regen
       if not enabled:
-        # Stock ECU sends max regen when not enabled.
-        apply_gas = P.MAX_ACC_REGEN
-        apply_brake = 0
-      else:
-        apply_gas = int(round(interp(final_pedal, P.GAS_LOOKUP_BP, P.GAS_LOOKUP_V)))
-        apply_brake = int(round(interp(final_pedal, P.BRAKE_LOOKUP_BP, P.BRAKE_LOOKUP_V)))
-      if not self.car_fingerprint in NO_ASCM_CARS:
-        # Gas/regen and brakes - all at 25Hz
-        if (frame % 4) == 0:
-          idx = (frame // 4) % 4
-          at_full_stop = enabled and CS.out.standstill
-          near_stop = enabled and (CS.out.vEgo < P.NEAR_STOP_BRAKE_PHASE)
-          can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, CanBus.CHASSIS, apply_brake, idx, near_stop, at_full_stop))
-          at_full_stop = enabled and CS.out.standstill
-          can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, CanBus.POWERTRAIN, apply_gas, idx, enabled, at_full_stop))
-      elif CS.CP.enableGasInterceptor:
-        #It seems in L mode, accel / decel point is around 1/5
-        #0----decel-------0.2-------accel----------1
-        new_gas = 0.8 * actuators.gas + 0.2
-        new_brake = 0.2 * actuators.brake
-        #I am assuming we should not get both a gas and a break value...
-        final_pedal2 = new_gas - new_brake
-        #TODO: Hysteresis
-        #TODO: Use friction brake via AEB for harder braking
+        # Since no input technically maps to 0.15, send 0.0 when not enabled to avoid
+        # controls mismatch.
+        final_pedal = 0.0
+      #TODO: Use friction brake via AEB for harder braking
+      
+      # apply pedal hysteresis and clip the final output to valid values.
+      final_pedal, self.pedal_steady = actuator_hystereses(final_pedal, self.pedal_steady)
+      pedal_gas = clip(final_pedal, 0., 1.)
 
-        #JJS - no adjust yet - scaling needs to be -1 <-> +1
-        pedal_gas = clip(final_pedal, 0., 1.)
-        #This would be more appropriate
-        #pedal_gas = clip(actuators.gas, 0., 1.)
-        if (frame % 4) == 0:
-          idx = (frame // 4) % 4
-          # send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
-          # This prevents unexpected pedal range rescaling
-          can_sends.append(create_gas_command(self.packer_pt, pedal_gas, idx))
-
-      # Send dashboard UI commands (ACC status), 25hz
       if (frame % 4) == 0:
-        can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, CanBus.POWERTRAIN, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car))
+        idx = (frame // 4) % 4
+        # send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
+        # This prevents unexpected pedal range rescaling
+        can_sends.append(create_gas_command(self.packer_pt, pedal_gas, idx))
 
-      # Radar needs to know current speed and yaw rate (50hz),
-      # and that ADAS is alive (10hz)
-      time_and_headlights_step = 10
-      tt = frame * DT_CTRL
+    # Send dashboard UI commands (ACC status), 25hz
+    if (frame % 4) == 0:
+      send_fcw = hud_alert == VisualAlert.fcw
+      can_sends.append(gmcan.create_acc_dashboard_command(self.packer_pt, CanBus.POWERTRAIN, enabled, hud_v_cruise * CV.MS_TO_KPH, hud_show_car, send_fcw))
 
-      if frame % time_and_headlights_step == 0:
-        idx = (frame // time_and_headlights_step) % 4
-        can_sends.append(gmcan.create_adas_time_status(CanBus.OBSTACLE, int((tt - self.start_time) * 60), idx))
-        can_sends.append(gmcan.create_adas_headlights_status(CanBus.OBSTACLE))
+    # Radar needs to know current speed and yaw rate (50hz),
+    # and that ADAS is alive (10hz)
+    time_and_headlights_step = 10
+    # tt = frame * DT_CTRL
 
-      speed_and_accelerometer_step = 2
-      if frame % speed_and_accelerometer_step == 0:
-        idx = (frame // speed_and_accelerometer_step) % 4
-        can_sends.append(gmcan.create_adas_steering_status(CanBus.OBSTACLE, idx))
-        can_sends.append(gmcan.create_adas_accelerometer_speed_status(CanBus.OBSTACLE, CS.out.vEgo, idx))
+    if frame % time_and_headlights_step == 0:
+      idx = (frame // time_and_headlights_step) % 4
+      #can_sends.append(gmcan.create_adas_time_status(CanBus.OBSTACLE, int((tt - self.start_time) * 60), idx))
+      #can_sends.append(gmcan.create_adas_headlights_status(self.packer_obj, CanBus.OBSTACLE))
 
-      if frame % P.ADAS_KEEPALIVE_STEP == 0:
-        can_sends += gmcan.create_adas_keepalive(CanBus.POWERTRAIN)
+    speed_and_accelerometer_step = 2
+    if frame % speed_and_accelerometer_step == 0:
+      idx = (frame // speed_and_accelerometer_step) % 4
+      #can_sends.append(gmcan.create_adas_steering_status(CanBus.OBSTACLE, idx))
+      #can_sends.append(gmcan.create_adas_accelerometer_speed_status(CanBus.OBSTACLE, CS.out.vEgo, idx))
 
-      # Show green icon when LKA torque is applied, and
-      # alarming orange icon when approaching torque limit.
-      # If not sent again, LKA icon disappears in about 5 seconds.
-      # Conveniently, sending camera message periodically also works as a keepalive.
-      lka_active = CS.lkas_status == 1
-      lka_critical = lka_active and abs(actuators.steer) > 0.9
-      lka_icon_status = (lka_active, lka_critical)
-      if frame % P.CAMERA_KEEPALIVE_STEP == 0 \
-          or lka_icon_status != self.lka_icon_status_last:
-        can_sends.append(gmcan.create_lka_icon_command(CanBus.SW_GMLAN, lka_active, lka_critical, steer))
-        self.lka_icon_status_last = lka_icon_status
+    if frame % P.ADAS_KEEPALIVE_STEP == 0:
+      can_sends += gmcan.create_adas_keepalive(CanBus.POWERTRAIN)
+
+    # Show green icon when LKA torque is applied, and
+    # alarming orange icon when approaching torque limit.
+    # If not sent again, LKA icon disappears in about 5 seconds.
+    # Conveniently, sending camera message periodically also works as a keepalive.
+    lka_active = lkas_enabled == 1
+    lka_critical = lka_active and abs(actuators.steer) > 0.9
+    lka_icon_status = (lka_active, lka_critical)
+    if frame % P.CAMERA_KEEPALIVE_STEP == 0 or lka_icon_status != self.lka_icon_status_last:
+      steer_alert = hud_alert == VisualAlert.steerRequired
+      can_sends.append(gmcan.create_lka_icon_command(CanBus.SW_GMLAN, lka_active, lka_critical, steer_alert))
+      self.lka_icon_status_last = lka_icon_status
 
     return can_sends

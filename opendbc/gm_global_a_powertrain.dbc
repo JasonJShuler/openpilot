@@ -224,12 +224,6 @@ BO_ 1912 PSCM_778: 8 K43_PSCM
 
 BO_ 1930 ASCM_78A: 7 K124_ASCM
 
-BO_ 800 FCABrakingCmd: 6 XXX
- SG_ RollingCounter : 5|2@0+ (1,0) [0|3] "" XXX
- SG_ Checksum : 27|20@0+ (1,0) [0|2047] "" XXX
- SG_ BrakeCmdActive : 3|1@1+ (1,0) [0|1] "" XXX
- SG_ BrakingForce : 2|7@0+ (1,0) [0|7] "" XXX
-
 BO_TX_BU_ 384 : K124_ASCM,NEO;
 BO_TX_BU_ 880 : NEO,K124_ASCM;
 BO_TX_BU_ 1033 : K124_ASCM,NEO;

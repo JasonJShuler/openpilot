@@ -2,9 +2,19 @@
 #include "impl_zmq.hpp"
 #include "impl_msgq.hpp"
 
+#ifdef __APPLE__
+const bool MUST_USE_ZMQ = true;
+#else
+const bool MUST_USE_ZMQ = false;
+#endif
+
+bool messaging_use_zmq(){
+  return std::getenv("ZMQ") || MUST_USE_ZMQ;
+}
+
 Context * Context::create(){
   Context * c;
-  if (std::getenv("ZMQ")){
+  if (messaging_use_zmq()){
     c = new ZMQContext();
   } else {
     c = new MSGQContext();
@@ -14,7 +24,7 @@ Context * Context::create(){
 
 SubSocket * SubSocket::create(){
   SubSocket * s;
-  if (std::getenv("ZMQ")){
+  if (messaging_use_zmq()){
     s = new ZMQSubSocket();
   } else {
     s = new MSGQSubSocket();
@@ -22,33 +32,9 @@ SubSocket * SubSocket::create(){
   return s;
 }
 
-SubSocket * SubSocket::create(Context * context, std::string endpoint){
+SubSocket * SubSocket::create(Context * context, std::string endpoint, std::string address, bool conflate, bool check_endpoint){
   SubSocket *s = SubSocket::create();
-  int r = s->connect(context, endpoint, "127.0.0.1");
-
-  if (r == 0) {
-    return s;
-  } else {
-    delete s;
-    return NULL;
-  }
-}
-
-SubSocket * SubSocket::create(Context * context, std::string endpoint, std::string address){
-  SubSocket *s = SubSocket::create();
-  int r = s->connect(context, endpoint, address);
-
-  if (r == 0) {
-    return s;
-  } else {
-    delete s;
-    return NULL;
-  }
-}
-
-SubSocket * SubSocket::create(Context * context, std::string endpoint, std::string address, bool conflate){
-  SubSocket *s = SubSocket::create();
-  int r = s->connect(context, endpoint, address, conflate);
+  int r = s->connect(context, endpoint, address, conflate, check_endpoint);
 
   if (r == 0) {
     return s;
@@ -60,7 +46,7 @@ SubSocket * SubSocket::create(Context * context, std::string endpoint, std::stri
 
 PubSocket * PubSocket::create(){
   PubSocket * s;
-  if (std::getenv("ZMQ")){
+  if (messaging_use_zmq()){
     s = new ZMQPubSocket();
   } else {
     s = new MSGQPubSocket();
@@ -68,9 +54,9 @@ PubSocket * PubSocket::create(){
   return s;
 }
 
-PubSocket * PubSocket::create(Context * context, std::string endpoint){
+PubSocket * PubSocket::create(Context * context, std::string endpoint, bool check_endpoint){
   PubSocket *s = PubSocket::create();
-  int r = s->connect(context, endpoint);
+  int r = s->connect(context, endpoint, check_endpoint);
 
   if (r == 0) {
     return s;
@@ -82,7 +68,7 @@ PubSocket * PubSocket::create(Context * context, std::string endpoint){
 
 Poller * Poller::create(){
   Poller * p;
-  if (std::getenv("ZMQ")){
+  if (messaging_use_zmq()){
     p = new ZMQPoller();
   } else {
     p = new MSGQPoller();

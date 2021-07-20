@@ -57,6 +57,16 @@ bool MessageState::parse(uint64_t sec, uint16_t ts_, uint8_t * dat) {
         if (!update_counter_generic(tmp, sig.b2)) {
         return false;
       }
+    } else if (sig.type == SignalType::SUBARU_CHECKSUM) {
+      if (subaru_checksum(address, dat_be, size) != tmp) {
+        INFO("0x%X CHECKSUM FAIL\n", address);
+        return false;
+      }
+    } else if (sig.type == SignalType::CHRYSLER_CHECKSUM) {
+      if (chrysler_checksum(address, dat_le, size) != tmp) {
+        INFO("0x%X CHECKSUM FAIL\n", address);
+        return false;
+      }
     } else if (sig.type == SignalType::PEDAL_CHECKSUM) {
       if (pedal_checksum(dat_be, size) != tmp) {
         INFO("0x%X PEDAL CHECKSUM FAIL\n", address);
@@ -161,7 +171,6 @@ CANParser::CANParser(int abus, const std::string& dbc_name,
 
 void CANParser::UpdateCans(uint64_t sec, const capnp::List<cereal::CanData>::Reader& cans) {
     int msg_count = cans.size();
-    uint64_t p;
 
     DEBUG("got %d messages\n", msg_count);
 
@@ -178,7 +187,7 @@ void CANParser::UpdateCans(uint64_t sec, const capnp::List<cereal::CanData>::Rea
         continue;
       }
 
-      if (cmsg.getDat().size() > 8) continue; //shouldnt ever happen
+      if (cmsg.getDat().size() > 8) continue; //shouldn't ever happen
       uint8_t dat[8] = {0};
       memcpy(dat, cmsg.getDat().begin(), cmsg.getDat().size());
 
@@ -199,7 +208,7 @@ void CANParser::UpdateValid(uint64_t sec) {
   }
 }
 
-void CANParser::update_string(std::string data, bool sendcan) {
+void CANParser::update_string(const std::string &data, bool sendcan) {
   // format for board, make copy due to alignment issues, will be freed on out of scope
   auto amsg = kj::heapArray<capnp::word>((data.length() / sizeof(capnp::word)) + 1);
   memcpy(amsg.begin(), data.data(), data.length());

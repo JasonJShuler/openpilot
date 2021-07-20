@@ -11,21 +11,21 @@ $Java.outerClassname("Car");
 
 struct CarEvent @0x9b1657f34caf3ad3 {
   name @0 :EventName;
+
+  # event types
   enable @1 :Bool;
   noEntry @2 :Bool;
-  warning @3 :Bool;
+  warning @3 :Bool;   # alerts presented only when  enabled or soft disabling
   userDisable @4 :Bool;
   softDisable @5 :Bool;
   immediateDisable @6 :Bool;
   preEnable @7 :Bool;
-  permanent @8 :Bool;
+  permanent @8 :Bool; # alerts presented regardless of openpilot state
 
   enum EventName @0xbaa8c5d505f727de {
-    # TODO: copy from error list
     canError @0;
     steerUnavailable @1;
     brakeUnavailable @2;
-    gasUnavailable @3;
     wrongGear @4;
     doorOpen @5;
     seatbeltNotLatched @6;
@@ -37,8 +37,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     buttonEnable @12;
     pedalPressed @13;
     cruiseDisabled @14;
-    radarCanError @15;
-    dataNeeded @16;
     speedTooLow @17;
     outOfSpace @18;
     overheat @19;
@@ -49,29 +47,22 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     pcmDisable @24;
     noTarget @25;
     radarFault @26;
-    modelCommIssueDEPRECATED @27;
     brakeHold @28;
     parkBrake @29;
     manualRestart @30;
     lowSpeedLockout @31;
     plannerError @32;
-    ipasOverride @33;
     debugAlert @34;
     steerTempUnavailableMute @35;
     resumeRequired @36;
     preDriverDistracted @37;
     promptDriverDistracted @38;
     driverDistracted @39;
-    geofence @40;
-    driverMonitorOn @41;
-    driverMonitorOff @42;
     preDriverUnresponsive @43;
     promptDriverUnresponsive @44;
     driverUnresponsive @45;
     belowSteerSpeed @46;
-    calibrationProgress @47;
     lowBattery @48;
-    invalidGiraffeHonda @49;
     vehicleModelInvalid @50;
     controlsFailed @51;
     sensorDataInvalid @52;
@@ -82,15 +73,53 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     preLaneChangeLeft @57;
     preLaneChangeRight @58;
     laneChange @59;
-    invalidGiraffeToyota @60;
-    internetConnectivityNeeded @61;
     communityFeatureDisallowed @62;
     lowMemory @63;
     stockAeb @64;
     ldw @65;
     carUnrecognized @66;
-    radarCommIssue @67;
     driverMonitorLowAcc @68;
+    invalidLkasSetting @69;
+    speedTooHigh @70;
+    laneChangeBlocked @71;
+    relayMalfunction @72;
+    gasPressed @73;
+    stockFcw @74;
+    startup @75;
+    startupNoCar @76;
+    startupNoControl @77;
+    startupMaster @78;
+    fcw @79;
+    steerSaturated @80;
+    belowEngageSpeed @84;
+    noGps @85;
+    wrongCruiseMode @87;
+    modeldLagging @89;
+    deviceFalling @90;
+    fanMalfunction @91;
+    cameraMalfunction @92;
+    gpsMalfunction @94;
+    startupOneplus @82;
+    processNotRunning @95;
+
+    radarCanErrorDEPRECATED @15;
+    radarCommIssueDEPRECATED @67;
+    gasUnavailableDEPRECATED @3;
+    dataNeededDEPRECATED @16;
+    modelCommIssueDEPRECATED @27;
+    ipasOverrideDEPRECATED @33;
+    geofenceDEPRECATED @40;
+    driverMonitorOnDEPRECATED @41;
+    driverMonitorOffDEPRECATED @42;
+    calibrationProgressDEPRECATED @47;
+    invalidGiraffeHondaDEPRECATED @49;
+    invalidGiraffeToyotaDEPRECATED @60;
+    internetConnectivityNeededDEPRECATED @61;
+    whitePandaUnsupportedDEPRECATED @81;
+    commIssueWarningDEPRECATED @83;
+    focusRecoverActiveDEPRECATED @86;
+    neosUpdateRequiredDEPRECATED @88;
+    modelLagWarningDEPRECATED @93;
   }
 }
 
@@ -98,7 +127,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
 # all speeds in m/s
 
 struct CarState {
-  errorsDEPRECATED @0 :List(CarEvent.EventName);
   events @13 :List(CarEvent);
 
   # car speed
@@ -119,12 +147,14 @@ struct CarState {
   brakeLights @19 :Bool;
 
   # steering wheel
-  steeringAngle @7 :Float32;   # deg
-  steeringRate @15 :Float32;   # deg/s
-  steeringTorque @8 :Float32;  # TODO: standardize units
+  steeringAngleDeg @7 :Float32;
+  steeringRateDeg @15 :Float32;
+  steeringTorque @8 :Float32;      # TODO: standardize units
   steeringTorqueEps @27 :Float32;  # TODO: standardize units
-  steeringPressed @9 :Bool;    # if the user is using the steering wheel
-  steeringRateLimited @29 :Bool;    # if the torque is limited by the rate limiter
+  steeringPressed @9 :Bool;        # if the user is using the steering wheel
+  steeringRateLimited @29 :Bool;   # if the torque is limited by the rate limiter
+  steerWarning @35 :Bool;          # temporary steer unavailble
+  steerError @36 :Bool;            # permanent steer error
   stockAeb @30 :Bool;
   stockFcw @31 :Bool;
   espDisabled @32 :Bool;
@@ -152,6 +182,13 @@ struct CarState {
   # which packets this state came from
   canMonoTimes @12: List(UInt64);
 
+  # blindspot sensors
+  leftBlindspot @33 :Bool; # Is there something blocking the left lane change
+  rightBlindspot @34 :Bool; # Is there something blocking the right lane change
+
+  # HV Battery Power
+  hvBpower @37 :Float32;
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;
@@ -166,6 +203,7 @@ struct CarState {
     available @2 :Bool;
     speedOffset @3 :Float32;
     standstill @4 :Bool;
+    nonAdaptive @5 :Bool;
   }
 
   enum GearShifter {
@@ -201,6 +239,8 @@ struct CarState {
       gapAdjustCruise @11;
     }
   }
+
+  errorsDEPRECATED @0 :List(CarEvent.EventName);
 }
 
 # ******* radar state @ 20hz *******
@@ -244,10 +284,6 @@ struct CarControl {
   enabled @0 :Bool;
   active @7 :Bool;
 
-  gasDEPRECATED @1 :Float32;
-  brakeDEPRECATED @2 :Float32;
-  steeringTorqueDEPRECATED @3 :Float32;
-
   actuators @6 :Actuators;
 
   cruiseControl @4 :CruiseControl;
@@ -259,7 +295,7 @@ struct CarControl {
     brake @1: Float32;
     # range from -1.0 - 1.0
     steer @2: Float32;
-    steerAngle @3: Float32;
+    steeringAngleDeg @3: Float32;
   }
 
   struct CruiseControl {
@@ -295,8 +331,6 @@ struct CarControl {
     }
 
     enum AudibleAlert {
-      # these are the choices from the Honda
-      # map as good as you can for your car
       none @0;
       chimeEngage @1;
       chimeDisengage @2;
@@ -305,8 +339,13 @@ struct CarControl {
       chimeWarning2 @5;
       chimeWarningRepeat @6;
       chimePrompt @7;
+      chimeWarning2Repeat @8;
     }
   }
+
+  gasDEPRECATED @1 :Float32;
+  brakeDEPRECATED @2 :Float32;
+  steeringTorqueDEPRECATED @3 :Float32;
 }
 
 # ****** car param ******
@@ -323,6 +362,7 @@ struct CarParams {
 
   minEnableSpeed @7 :Float32;
   minSteerSpeed @8 :Float32;
+  maxSteeringAngleDeg @54 :Float32;
   safetyModel @9 :SafetyModel;
   safetyModelPassive @42 :SafetyModel = silent;
   safetyParam @10 :Int16;
@@ -364,17 +404,20 @@ struct CarParams {
   steerRateCost @33 :Float32; # Lateral MPC cost on steering rate
   steerControlType @34 :SteerControlType;
   radarOffCan @35 :Bool; # True when radar objects aren't visible on CAN
+  minSpeedCan @51 :Float32; # Minimum vehicle speed from CAN (below this value drops to 0)
+  stoppingBrakeRate @52 :Float32; # brake_travel/s while trying to stop
+  startingBrakeRate @53 :Float32; # brake_travel/s while releasing on restart
 
   steerActuatorDelay @36 :Float32; # Steering wheel actuator delay in seconds
   openpilotLongitudinalControl @37 :Bool; # is openpilot doing the longitudinal control?
   carVin @38 :Text; # VIN number queried during fingerprinting
-  isPandaBlack @39: Bool;
   dashcamOnly @41: Bool;
   transmissionType @43 :TransmissionType;
   carFw @44 :List(CarFw);
   radarTimeStep @45: Float32 = 0.05;  # time delta between radar updates, 20Hz is very standard
   communityFeature @46: Bool;  # true if a community maintained feature is detected
   fingerprintSource @49: FingerprintSource;
+  networkLocation @50 :NetworkLocation;  # Where Panda/C2 is integrated into the car's CAN network
 
   struct LateralParams {
     torqueBP @0 :List(Int32);
@@ -387,6 +430,8 @@ struct CarParams {
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
     kf @4 :Float32;
+    kdBP @5 :List(Float32);
+    kdV @6 :List(Float32);
   }
 
   struct LongitudinalPIDTuning {
@@ -399,10 +444,19 @@ struct CarParams {
   }
 
   struct LateralINDITuning {
-    outerLoopGain @0 :Float32;
-    innerLoopGain @1 :Float32;
-    timeConstant @2 :Float32;
-    actuatorEffectiveness @3 :Float32;
+    outerLoopGainBP @4 :List(Float32);
+    outerLoopGainV @5 :List(Float32);
+    innerLoopGainBP @6 :List(Float32);
+    innerLoopGainV @7 :List(Float32);
+    timeConstantBP @8 :List(Float32);
+    timeConstantV @9 :List(Float32);
+    actuatorEffectivenessBP @10 :List(Float32);
+    actuatorEffectivenessV @11 :List(Float32);
+
+    outerLoopGainDEPRECATED @0 :Float32;
+    innerLoopGainDEPRECATED @1 :Float32;
+    timeConstantDEPRECATED @2 :Float32;
+    actuatorEffectivenessDEPRECATED @3 :Float32;
   }
 
   struct LateralLQRTuning {
@@ -443,6 +497,8 @@ struct CarParams {
     hondaBoschHarness @20;
     volkswagenPq @21;
     subaruLegacy @22;  # pre-Global platform
+    hyundaiLegacy @23;
+    hyundaiCommunity @24;
   }
 
   enum SteerControlType {
@@ -452,8 +508,9 @@ struct CarParams {
 
   enum TransmissionType {
     unknown @0;
-    automatic @1;
-    manual @2;
+    automatic @1;  # Traditional auto, including DSG
+    manual @2;  # True "stick shift" only
+    direct @3;  # Electric vehicle or other direct drive
   }
 
   struct CarFw {
@@ -492,4 +549,11 @@ struct CarParams {
     fw @1;
     fixed @2;
   }
+
+  enum NetworkLocation {
+    fwdCamera @0;  # Standard/default integration at LKAS camera
+    gateway @1;    # Integration at vehicle's CAN gateway
+  }
+
+  isPandaBlackDEPRECATED @39: Bool;
 }

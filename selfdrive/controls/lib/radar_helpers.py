@@ -1,3 +1,4 @@
+from common.numpy_fast import mean
 from common.kalman.simple_kalman import KF1D
 from selfdrive.config import RADAR_TO_CAMERA
 
@@ -53,9 +54,6 @@ class Track():
     self.kf = KF1D([[self.vLead], [aLeadK]], self.K_A, self.K_C, self.K_K)
     self.aLeadK = aLeadK
     self.aLeadTau = aLeadTau
-
-def mean(l):
-  return sum(l) / len(l)
 
 
 class Cluster():
@@ -134,11 +132,11 @@ class Cluster():
 
   def get_RadarState_from_vision(self, lead_msg, v_ego):
     return {
-      "dRel": float(lead_msg.dist - RADAR_TO_CAMERA),
-      "yRel": float(lead_msg.relY),
-      "vRel": float(lead_msg.relVel),
-      "vLead": float(v_ego + lead_msg.relVel),
-      "vLeadK": float(v_ego + lead_msg.relVel),
+      "dRel": float(lead_msg.xyva[0] - RADAR_TO_CAMERA),
+      "yRel": float(-lead_msg.xyva[1]),
+      "vRel": float(lead_msg.xyva[2]),
+      "vLead": float(v_ego + lead_msg.xyva[2]),
+      "vLeadK": float(v_ego + lead_msg.xyva[2]),
       "aLeadK": float(0),
       "aLeadTau": _LEAD_ACCEL_TAU,
       "fcw": False,

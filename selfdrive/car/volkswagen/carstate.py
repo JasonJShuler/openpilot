@@ -28,16 +28,16 @@ class CarState(CarStateBase):
 
     # Update steering angle, rate, yaw rate, and driver input torque. VW send
     # the sign/direction in a separate signal so they must be recombined.
-    ret.steeringAngle = pt_cp.vl["LWI_01"]['LWI_Lenkradwinkel'] * (1,-1)[int(pt_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
-    ret.steeringRate = pt_cp.vl["LWI_01"]['LWI_Lenkradw_Geschw'] * (1,-1)[int(pt_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
-    ret.steeringTorque = pt_cp.vl["EPS_01"]['Driver_Strain'] * (1,-1)[int(pt_cp.vl["EPS_01"]['Driver_Strain_VZ'])]
+    ret.steeringAngleDeg = pt_cp.vl["LWI_01"]['LWI_Lenkradwinkel'] * (1, -1)[int(pt_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
+    ret.steeringRateDeg = pt_cp.vl["LWI_01"]['LWI_Lenkradw_Geschw'] * (1, -1)[int(pt_cp.vl["LWI_01"]['LWI_VZ_Lenkradwinkel'])]
+    ret.steeringTorque = pt_cp.vl["EPS_01"]['Driver_Strain'] * (1, -1)[int(pt_cp.vl["EPS_01"]['Driver_Strain_VZ'])]
     ret.steeringPressed = abs(ret.steeringTorque) > CarControllerParams.STEER_DRIVER_ALLOWANCE
-    ret.yawRate = pt_cp.vl["ESP_02"]['ESP_Gierrate'] * (1,-1)[int(pt_cp.vl["ESP_02"]['ESP_VZ_Gierrate'])] * CV.DEG_TO_RAD
+    ret.yawRate = pt_cp.vl["ESP_02"]['ESP_Gierrate'] * (1, -1)[int(pt_cp.vl["ESP_02"]['ESP_VZ_Gierrate'])] * CV.DEG_TO_RAD
 
     # Update gas, brakes, and gearshift.
     ret.gas = pt_cp.vl["Motor_20"]['MO_Fahrpedalrohwert_01'] / 100.0
     ret.gasPressed = ret.gas > 0
-    ret.brake = pt_cp.vl["ESP_05"]['ESP_Bremsdruck'] / 250.0 # FIXME: this is pressure in Bar, not sure what OP expects
+    ret.brake = pt_cp.vl["ESP_05"]['ESP_Bremsdruck'] / 250.0  # FIXME: this is pressure in Bar, not sure what OP expects
     ret.brakePressed = bool(pt_cp.vl["ESP_05"]['ESP_Fahrer_bremst'])
     ret.brakeLights = bool(pt_cp.vl["ESP_05"]['ESP_Status_Bremsdruck'])
 
@@ -53,7 +53,7 @@ class CarState(CarStateBase):
                         pt_cp.vl["Gateway_72"]['ZV_HD_offen']])
 
     # Update seatbelt fastened status.
-    ret.seatbeltUnlatched = False if pt_cp.vl["Airbag_02"]["AB_Gurtschloss_FA"] == 3 else True
+    ret.seatbeltUnlatched = pt_cp.vl["Airbag_02"]["AB_Gurtschloss_FA"] != 3
 
     # Update driver preference for metric. VW stores many different unit
     # preferences, including separate units for for distance vs. speed.
@@ -61,25 +61,17 @@ class CarState(CarStateBase):
     self.displayMetricUnits = not pt_cp.vl["Einheiten_01"]["KBI_MFA_v_Einheit_02"]
 
     # Update ACC radar status.
-    accStatus = pt_cp.vl["ACC_06"]['ACC_Status_ACC']
-    if accStatus == 1:
-      # ACC okay but disabled
-      self.accFault = False
-      ret.cruiseState.available = False
-      ret.cruiseState.enabled = False
-    elif accStatus == 2:
+    accStatus = pt_cp.vl["TSK_06"]['TSK_Status']
+    if accStatus == 2:
       # ACC okay and enabled, but not currently engaged
-      self.accFault = False
       ret.cruiseState.available = True
       ret.cruiseState.enabled = False
     elif accStatus in [3, 4, 5]:
       # ACC okay and enabled, currently engaged and regulating speed (3) or engaged with driver accelerating (4) or overrun (5)
-      self.accFault = False
       ret.cruiseState.available = True
       ret.cruiseState.enabled = True
     else:
-      # ACC fault of some sort. Seen statuses 6 or 7 for CAN comms disruptions, visibility issues, etc.
-      self.accFault = True
+      # ACC okay but disabled (1), or a radar visibility or other fault/disruption (6 or 7)
       ret.cruiseState.available = False
       ret.cruiseState.enabled = False
 
@@ -115,7 +107,7 @@ class CarState(CarStateBase):
     self.steeringFault = not pt_cp.vl["EPS_01"]["HCA_Ready"]
 
     # Additional safety checks performed in CarInterface.
-    self.parkingBrakeSet = bool(pt_cp.vl["Kombi_01"]['KBI_Handbremse']) # FIXME: need to include an EPB check as well
+    self.parkingBrakeSet = bool(pt_cp.vl["Kombi_01"]['KBI_Handbremse'])  # FIXME: need to include an EPB check as well
     ret.espDisabled = pt_cp.vl["ESP_21"]['ESP_Tastung_passiv'] != 0
 
     return ret
@@ -156,6 +148,7 @@ class CarState(CarStateBase):
       ("ESP_Tastung_passiv", "ESP_21", 0),          # Stability control disabled
       ("KBI_MFA_v_Einheit_02", "Einheiten_01", 0),  # MPH vs KMH speed display
       ("KBI_Handbremse", "Kombi_01", 0),            # Manual handbrake applied
+      ("TSK_Status", "TSK_06", 0),                  # ACC engagement status from drivetrain coordinator
       ("TSK_Fahrzeugmasse_02", "Motor_16", 0),      # Estimated vehicle mass from drivetrain coordinator
       ("ACC_Status_ACC", "ACC_06", 0),              # ACC engagement status
       ("ACC_Typ", "ACC_06", 0),                     # ACC type (follow to stop, stop&go)
@@ -166,7 +159,7 @@ class CarState(CarStateBase):
       ("GRA_Tip_Hoch", "GRA_ACC_01", 0),            # ACC button, increase or accel
       ("GRA_Tip_Runter", "GRA_ACC_01", 0),          # ACC button, decrease or decel
       ("GRA_Tip_Wiederaufnahme", "GRA_ACC_01", 0),  # ACC button, resume
-      ("GRA_Verstellung_Zeitluecke", "GRA_ACC_01", 0), # ACC button, time gap adj
+      ("GRA_Verstellung_Zeitluecke", "GRA_ACC_01", 0),  # ACC button, time gap adj
       ("GRA_Typ_Hauptschalter", "GRA_ACC_01", 0),   # ACC main button type
       ("GRA_Tip_Stufe_2", "GRA_ACC_01", 0),         # unknown related to stalk type
       ("GRA_ButtonTypeInfo", "GRA_ACC_01", 0),      # unknown related to stalk type
@@ -182,6 +175,7 @@ class CarState(CarStateBase):
       ("ESP_21", 50),       # From J104 ABS/ESP controller
       ("ACC_06", 50),       # From J428 ACC radar control module
       ("Motor_20", 50),     # From J623 Engine control module
+      ("TSK_06", 50),       # From J623 Engine control module
       ("GRA_ACC_01", 33),   # From J??? steering wheel control buttons
       ("ACC_02", 17),       # From J428 ACC radar control module
       ("Getriebe_11", 20),  # From J743 Auto transmission control module

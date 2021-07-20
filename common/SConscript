@@ -1,6 +1,4 @@
-Import('env')
+Import('envCython')
 
-# parser
-env.Command(['common_pyx.so'],
-  ['common_pyx_setup.py', 'clock.pyx'],
-  "cd common && python3 common_pyx_setup.py build_ext --inplace")
+envCython.Program('clock.so', 'clock.pyx')
+envCython.Program('params_pyx.so', 'params_pyx.pyx')

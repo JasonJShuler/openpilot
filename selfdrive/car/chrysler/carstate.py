@@ -24,7 +24,7 @@ class CarState(CarStateBase):
                         cp.vl["DOORS"]['DOOR_OPEN_RR']])
     ret.seatbeltUnlatched = cp.vl["SEATBELT_STATUS"]['SEATBELT_DRIVER_UNLATCHED'] == 1
 
-    ret.brakePressed = cp.vl["BRAKE_2"]['BRAKE_PRESSED_2'] == 5 # human-only
+    ret.brakePressed = cp.vl["BRAKE_2"]['BRAKE_PRESSED_2'] == 5  # human-only
     ret.brake = 0
     ret.brakeLights = ret.brakePressed
     ret.gas = cp.vl["ACCEL_GAS_134"]['ACCEL_134']
@@ -42,19 +42,21 @@ class CarState(CarStateBase):
 
     ret.leftBlinker = cp.vl["STEERING_LEVERS"]['TURN_SIGNALS'] == 1
     ret.rightBlinker = cp.vl["STEERING_LEVERS"]['TURN_SIGNALS'] == 2
-    ret.steeringAngle = cp.vl["STEERING"]['STEER_ANGLE']
-    ret.steeringRate = cp.vl["STEERING"]['STEERING_RATE']
+    ret.steeringAngleDeg = cp.vl["STEERING"]['STEER_ANGLE']
+    ret.steeringRateDeg = cp.vl["STEERING"]['STEERING_RATE']
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(cp.vl['GEAR']['PRNDL'], None))
 
     ret.cruiseState.enabled = cp.vl["ACC_2"]['ACC_STATUS_2'] == 7  # ACC is green.
     ret.cruiseState.available = ret.cruiseState.enabled  # FIXME: for now same as enabled
     ret.cruiseState.speed = cp.vl["DASHBOARD"]['ACC_SPEED_CONFIG_KPH'] * CV.KPH_TO_MS
+    # CRUISE_STATE is a three bit msg, 0 is off, 1 and 2 are Non-ACC mode, 3 and 4 are ACC mode, find if there are other states too
+    ret.cruiseState.nonAdaptive = cp.vl["DASHBOARD"]['CRUISE_STATE'] in [1, 2]
 
     ret.steeringTorque = cp.vl["EPS_STATUS"]["TORQUE_DRIVER"]
     ret.steeringTorqueEps = cp.vl["EPS_STATUS"]["TORQUE_MOTOR"]
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
     steer_state = cp.vl["EPS_STATUS"]["LKAS_STATE"]
-    self.steer_error = steer_state == 4 or (steer_state == 0 and ret.vEgo > self.CP.minSteerSpeed)
+    ret.steerError = steer_state == 4 or (steer_state == 0 and ret.vEgo > self.CP.minSteerSpeed)
 
     ret.genericToggle = bool(cp.vl["STEERING_LEVERS"]['HIGH_BEAM_FLASH'])
 
@@ -87,6 +89,7 @@ class CarState(CarStateBase):
       ("ACC_STATUS_2", "ACC_2", 0),
       ("HIGH_BEAM_FLASH", "STEERING_LEVERS", 0),
       ("ACC_SPEED_CONFIG_KPH", "DASHBOARD", 0),
+      ("CRUISE_STATE", "DASHBOARD", 0),
       ("TORQUE_DRIVER", "EPS_STATUS", 0),
       ("TORQUE_MOTOR", "EPS_STATUS", 0),
       ("LKAS_STATE", "EPS_STATUS", 1),
@@ -103,6 +106,13 @@ class CarState(CarStateBase):
       ("WHEEL_SPEEDS", 50),
       ("STEERING", 100),
       ("ACC_2", 50),
+      ("GEAR", 50),
+      ("ACCEL_GAS_134", 50),
+      ("DASHBOARD", 15),
+      ("STEERING_LEVERS", 10),
+      ("SEATBELT_STATUS", 2),
+      ("DOORS", 1),
+      ("TRACTION_BUTTON", 1),
     ]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0)
@@ -115,6 +125,10 @@ class CarState(CarStateBase):
       ("CAR_MODEL", "LKAS_HUD", -1),
       ("LKAS_STATUS_OK", "LKAS_HEARTBIT", -1)
     ]
-    checks = []
+    checks = [
+      ("LKAS_COMMAND", 100),
+      ("LKAS_HEARTBIT", 10),
+      ("LKAS_HUD", 4),
+    ]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 2)

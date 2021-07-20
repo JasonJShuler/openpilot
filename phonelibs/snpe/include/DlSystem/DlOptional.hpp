@@ -1,6 +1,6 @@
 //==============================================================================
 //
-//  Copyright (c) 2016 Qualcomm Technologies, Inc.
+//  Copyright (c) 2016, 2020 Qualcomm Technologies, Inc.
 //  All Rights Reserved.
 //  Confidential and Proprietary - Qualcomm Technologies, Inc.
 //
@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <utility>
+#include <stdexcept>
 
 #include "DlSystem/ZdlExportDefine.hpp"
 
@@ -35,10 +36,10 @@ template <typename T>
 class ZDL_EXPORT Optional final {
 public:
    enum class LIFECYCLE {
-      NONE,
-      REFERENCE_OWNED,
-      POINTER_OWNED,
-      POINTER_NOT_OWNED
+      NONE = 0,
+      REFERENCE_OWNED = 1,
+      POINTER_OWNED = 2,
+      POINTER_NOT_OWNED = 3
    };
 
    struct ReferenceCount {
@@ -173,25 +174,25 @@ private:
 
    template <typename Q = T>
    typename std::enable_if<std::is_same<U, Q>::value, const Q&>::type GetReference() const noexcept {
-      if (!isReference()) throw std::bad_exception();
+      if (!isReference()) std::terminate();
       return *static_cast<const Q*>(m_StoragePtr);
    }
 
    template <typename Q = T>
    typename std::enable_if<std::is_same<U*, Q>::value, const Q&>::type GetReference() const noexcept {
-      if (!isPointer()) throw std::bad_exception();
+      if (!isPointer()) std::terminate();
       return static_cast<const Q&>(m_StoragePtr);
    }
 
    template <typename Q = T>
    typename std::enable_if<std::is_same<U, Q>::value, Q&>::type GetReference() noexcept {
-      if (!isReference()) throw std::bad_exception();
+      if (!isReference()) std::terminate();
       return *m_StoragePtr;
    }
 
    template <typename Q = T>
    typename std::enable_if<std::is_same<U*, Q>::value, Q&>::type GetReference() noexcept {
-      if (!isPointer()) throw std::bad_exception();
+      if (!isPointer()) std::terminate();
       return m_StoragePtr;
    }
 

@@ -21,8 +21,8 @@ typedef struct {
 const int GM_MAX_STEER = 300;
 const int GM_MAX_RT_DELTA = 128;          // max delta torque allowed for real time checks
 const uint32_t GM_RT_INTERVAL = 250000;    // 250ms between real time checks
-const int GM_MAX_RATE_UP = 7;
-const int GM_MAX_RATE_DOWN = 17;
+const int GM_MAX_RATE_UP = 10;
+const int GM_MAX_RATE_DOWN = 20;
 const int GM_DRIVER_TORQUE_ALLOWANCE = 50;
 const int GM_DRIVER_TORQUE_FACTOR = 4;
 const int GM_MAX_GAS = 3072;
@@ -76,15 +76,6 @@ static void gm_apply_buffer(volatile gm_dual_buffer *buffer, bool stock) {
     buffer->current_ts = buffer->op_ts;
   }
 }
-
-// //Populate the stock lkas - called by fwd hook
-// static void gm_set_stock_lkas(CAN_FIFOMailBox_TypeDef *to_send) {
-//   gm_lkas_buffer.stock_frame.RIR = to_send->RIR;
-//   gm_lkas_buffer.stock_frame.RDTR = to_send->RDTR;
-//   gm_lkas_buffer.stock_frame.RDLR = to_send->RDLR;
-//   gm_lkas_buffer.stock_frame.RDHR = to_send->RDHR;
-//   gm_lkas_buffer.stock_ts = TIM2->CNT;
-// }
 
 //Populate the OP lkas - called by tx hook
 static void gm_set_op_lkas(CAN_FIFOMailBox_TypeDef *to_send) {
@@ -370,33 +361,6 @@ static int gm_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
   return tx;
 }
 
-// static int gm_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
-//   if (board_has_relay() && !gm_relay_open) return 0; //for now, when relay is closed we don't want to do anything
-//   gm_detect_cam();
-//   int bus_fwd = -1;
-//   if (bus_num == 0) {
-//     if (gm_ffc_detected) {
-//       //only perform forwarding if we have seen LKAS messages on CAN2
-//       bus_fwd = gm_camera_bus;  // Camera is on CAN2
-//     }
-//   }
-//   if (bus_num == gm_camera_bus) {
-//     int addr = GET_ADDR(to_fwd);
-//     if (addr != 384) {
-//       //only perform forwarding if we have seen LKAS messages on CAN2
-//       if (gm_ffc_detected) {
-//         return 0;
-//       }
-//     }
-//     gm_set_stock_lkas(to_fwd);
-//     gm_ffc_detected = true;
-//     gm_init_lkas_pump();
-//   }
-
-//   // fallback to do not forward
-//   return bus_fwd;
-// }
-
 
 static CAN_FIFOMailBox_TypeDef * gm_pump_hook(void) {
   volatile int pedal_pressed = (volatile int)gm_gas_prev || ((volatile int)gm_brake_prev && (volatile int)gm_moving);
@@ -491,7 +455,7 @@ const safety_hooks gm_hooks = {
   .rx = gm_rx_hook,
   .tx = gm_tx_hook,
   .tx_lin = nooutput_tx_lin_hook,
-  .fwd = default_fwd_hook,
+  //.fwd = gm_fwd_hook,
   .addr_check = gm_rx_checks,
   .addr_check_len = sizeof(gm_rx_checks) / sizeof(gm_rx_checks[0]),
 };

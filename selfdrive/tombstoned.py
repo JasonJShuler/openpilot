@@ -1,122 +1,215 @@
+#!/usr/bin/env python3
+import datetime
 import os
 import re
+import shutil
+import signal
+import subprocess
 import time
-import datetime
+import glob
 
 from raven import Client
 from raven.transport.http import HTTPTransport
 
-from selfdrive.version import version, dirty
+from common.file_helpers import mkdirs_exists_ok
+from selfdrive.hardware import TICI
+from selfdrive.loggerd.config import ROOT
 from selfdrive.swaglog import cloudlog
+from selfdrive.version import branch, commit, dirty, origin, version
 
-def get_tombstones():
-  DIR_DATA = "/data/tombstones/"
-  return [(DIR_DATA + fn, int(os.stat(DIR_DATA + fn).st_ctime) )
-          for fn in os.listdir(DIR_DATA) if fn.startswith("tombstone")]
+MAX_SIZE = 100000 * 10  # mal size is 40-100k, allow up to 1M
+if TICI:
+  MAX_SIZE = MAX_SIZE * 100  # Allow larger size for tici since files contain coredump
+MAX_TOMBSTONE_FN_LEN = 62  # 85 - 23 ("<dongle id>/crash/")
 
-def report_tombstone(fn, client):
-  mtime = os.path.getmtime(fn)
-  with open(fn, encoding='ISO-8859-1') as f:
-    dat = f.read()
-
-  # see system/core/debuggerd/tombstone.cpp
-  parsed = re.match(r"[* ]*\n"
-                    r"(?P<header>CM Version:[\s\S]*?ABI:.*\n)"
-                    r"(?P<thread>pid:.*\n)"
-                    r"(?P<signal>signal.*\n)?"
-                    r"(?P<abort>Abort.*\n)?"
-                    r"(?P<registers>\s+x0[\s\S]*?\n)\n"
-                    r"(?:backtrace:\n"
-                      r"(?P<backtrace>[\s\S]*?\n)\n"
-                      r"stack:\n"
-                      r"(?P<stack>[\s\S]*?\n)\n"
-                    r")?", dat)
-
-  logtail = re.search(r"--------- tail end of.*\n([\s\S]*?\n)---", dat)
-  logtail = logtail and logtail.group(1)
-
-  if parsed:
-    parsedict = parsed.groupdict()
-  else:
-    parsedict = {}
-
-  thread_line = parsedict.get('thread', '')
-  thread_parsed = re.match(r'pid: (?P<pid>\d+), tid: (?P<tid>\d+), name: (?P<name>.*) >>> (?P<cmd>.*) <<<', thread_line)
-  if thread_parsed:
-    thread_parseddict = thread_parsed.groupdict()
-  else:
-    thread_parseddict = {}
-  pid = thread_parseddict.get('pid', '')
-  tid = thread_parseddict.get('tid', '')
-  name = thread_parseddict.get('name', 'unknown')
-  cmd = thread_parseddict.get('cmd', 'unknown')
-
-  signal_line = parsedict.get('signal', '')
-  signal_parsed = re.match(r'signal (?P<signal>.*?), code (?P<code>.*?), fault addr (?P<fault_addr>.*)\n', signal_line)
-  if signal_parsed:
-    signal_parseddict = signal_parsed.groupdict()
-  else:
-    signal_parseddict = {}
-  signal = signal_parseddict.get('signal', 'unknown')
-  code = signal_parseddict.get('code', 'unknown')
-  fault_addr = signal_parseddict.get('fault_addr', '')
-
-  abort_line = parsedict.get('abort', '')
-
-  if parsed:
-    message = 'Process {} ({}) got signal {} code {}'.format(name, cmd, signal, code)
-    if abort_line:
-      message += '\n'+abort_line
-  else:
-    message = fn+'\n'+dat[:1024]
+TOMBSTONE_DIR = "/data/tombstones/"
+APPORT_DIR = "/var/crash/"
 
 
+def safe_fn(s):
+  extra = ['_']
+  return "".join(c for c in s if c.isalnum() or c in extra).rstrip()
+
+
+def sentry_report(client, fn, message, contents):
+  cloudlog.error({'tombstone': message})
   client.captureMessage(
     message=message,
-    date=datetime.datetime.utcfromtimestamp(mtime),
-    data={
-      'logger':'tombstoned',
-      'platform':'other',
-    },
     sdk={'name': 'tombstoned', 'version': '0'},
     extra={
-      'fault_addr': fault_addr,
-      'abort_msg': abort_line,
-      'pid': pid,
-      'tid': tid,
-      'name':'{} ({})'.format(name, cmd),
       'tombstone_fn': fn,
-      'header': parsedict.get('header'),
-      'registers': parsedict.get('registers'),
-      'backtrace': parsedict.get('backtrace'),
-      'logtail': logtail,
-    },
-    tags={
-      'name':'{} ({})'.format(name, cmd),
-      'signal':signal,
-      'code':code,
-      'fault_addr':fault_addr,
+      'tombstone': contents
     },
   )
-  cloudlog.error({'tombstone': message})
+
+def clear_apport_folder():
+  for f in glob.glob(APPORT_DIR + '*'):
+    try:
+      os.remove(f)
+    except Exception:
+      pass
+
+
+def get_apport_stacktrace(fn):
+  try:
+    cmd = f'apport-retrace -s <(cat <(echo "Package: openpilot") "{fn}")'
+    return subprocess.check_output(cmd, shell=True, encoding='utf8', timeout=30, executable='/bin/bash')  # pylint: disable=unexpected-keyword-arg
+  except subprocess.CalledProcessError:
+    return "Error getting stacktrace"
+  except subprocess.TimeoutExpired:
+    return "Timeout getting stacktrace"
+
+
+def get_tombstones():
+  """Returns list of (filename, ctime) for all tombstones in /data/tombstones
+  and apport crashlogs in /var/crash"""
+  files = []
+  for folder in [TOMBSTONE_DIR, APPORT_DIR]:
+    if os.path.exists(folder):
+      with os.scandir(folder) as d:
+
+        # Loop over first 1000 directory entries
+        for _, f in zip(range(1000), d):
+          if f.name.startswith("tombstone"):
+            files.append((f.path, int(f.stat().st_ctime)))
+          elif f.name.endswith(".crash") and f.stat().st_mode == 0o100640:
+            files.append((f.path, int(f.stat().st_ctime)))
+  return files
+
+
+def report_tombstone_android(fn, client):
+  f_size = os.path.getsize(fn)
+  if f_size > MAX_SIZE:
+    cloudlog.error(f"Tombstone {fn} too big, {f_size}. Skipping...")
+    return
+
+  with open(fn, encoding='ISO-8859-1') as f:
+    contents = f.read()
+
+  message = " ".join(contents.split('\n')[5:7])
+
+  # Cut off pid/tid, since that varies per run
+  name_idx = message.find('name')
+  if name_idx >= 0:
+    message = message[name_idx:]
+
+  # Cut off fault addr
+  fault_idx = message.find(', fault addr')
+  if fault_idx >= 0:
+    message = message[:fault_idx]
+
+  sentry_report(client, fn, message, contents)
+
+
+def report_tombstone_apport(fn, client):
+  f_size = os.path.getsize(fn)
+  if f_size > MAX_SIZE:
+    cloudlog.error(f"Tombstone {fn} too big, {f_size}. Skipping...")
+    return
+
+  message = ""  # One line description of the crash
+  contents = ""  # Full file contents without coredump
+  path = ""  # File path relative to openpilot directory
+
+  proc_maps = False
+
+  with open(fn) as f:
+    for line in f:
+      if "CoreDump" in line:
+        break
+      elif "ProcMaps" in line:
+        proc_maps = True
+      elif "ProcStatus" in line:
+        proc_maps = False
+
+      if not proc_maps:
+        contents += line
+
+      if "ExecutablePath" in line:
+        path = line.strip().split(': ')[-1]
+        path = path.replace('/data/openpilot/', '')
+        message += path
+      elif "Signal" in line:
+        message += " - " + line.strip()
+
+        try:
+          sig_num = int(line.strip().split(': ')[-1])
+          message += " (" + signal.Signals(sig_num).name + ")"  # pylint: disable=no-member
+        except ValueError:
+          pass
+
+  stacktrace = get_apport_stacktrace(fn)
+  stacktrace_s = stacktrace.split('\n')
+  crash_function = "No stacktrace"
+
+  if len(stacktrace_s) > 2:
+    found = False
+
+    # Try to find first entry in openpilot, fall back to first line
+    for line in stacktrace_s:
+      if "at selfdrive/" in line:
+          crash_function = line
+          found = True
+          break
+
+    if not found:
+      crash_function = stacktrace_s[1]
+
+    # Remove arguments that can contain pointers to make sentry one-liner unique
+    crash_function = " ".join(x for x in crash_function.split(' ')[1:] if not x.startswith('0x'))
+    crash_function = re.sub(r'\(.*?\)', '', crash_function)
+
+  contents = stacktrace + "\n\n" + contents
+  message = message + " - " + crash_function
+  sentry_report(client, fn, message, contents)
+
+  # Copy crashlog to upload folder
+  clean_path = path.replace('/', '_')
+  date = datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")
+
+  new_fn = f"{date}_{commit[:8]}_{safe_fn(clean_path)}"[:MAX_TOMBSTONE_FN_LEN]
+
+  crashlog_dir = os.path.join(ROOT, "crash")
+  mkdirs_exists_ok(crashlog_dir)
+
+  # Files could be on different filesystems, copy, then delete
+  shutil.copy(fn, os.path.join(crashlog_dir, new_fn))
+
+  try:
+    os.remove(fn)
+  except PermissionError:
+    pass
 
 
 def main():
+  clear_apport_folder()  # Clear apport folder on start, otherwise duplicate crashes won't register
   initial_tombstones = set(get_tombstones())
 
+  tags = {
+    'dirty': dirty,
+    'origin': origin,
+    'branch': branch
+  }
   client = Client('https://d3b175702f62402c91ade04d1c547e68:b20d68c813c74f63a7cdf9c4039d8f56@sentry.io/157615',
-                  install_sys_hook=False, transport=HTTPTransport, release=version, tags={'dirty': dirty}, string_max_length=10000)
+                  install_sys_hook=False, transport=HTTPTransport, release=version, tags=tags, string_max_length=10000)
 
   client.user_context({'id': os.environ.get('DONGLE_ID')})
   while True:
     now_tombstones = set(get_tombstones())
 
-    for fn, ctime in (now_tombstones - initial_tombstones):
-      cloudlog.info("reporting new tombstone %s", fn)
-      report_tombstone(fn, client)
+    for fn, _ in (now_tombstones - initial_tombstones):
+      try:
+        cloudlog.info(f"reporting new tombstone {fn}")
+        if fn.endswith(".crash"):
+          report_tombstone_apport(fn, client)
+        else:
+          report_tombstone_android(fn, client)
+      except Exception:
+        cloudlog.exception(f"Error reporting tombstone {fn}")
 
     initial_tombstones = now_tombstones
     time.sleep(5)
+
 
 if __name__ == "__main__":
   main()

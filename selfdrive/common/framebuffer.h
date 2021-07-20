@@ -1,18 +1,8 @@
-#ifndef FRAMEBUFFER_H
-#define FRAMEBUFFER_H
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstdlib>
 
-typedef struct FramebufferState FramebufferState;
-
-FramebufferState* framebuffer_init(
-    const char* name, int32_t layer, int alpha,
-    int *out_w, int *out_h);
-
-void framebuffer_set_power(FramebufferState *s, int mode);
-void framebuffer_swap(FramebufferState *s);
+bool set_brightness(int brightness);
 
 /* Display power modes */
 enum {
@@ -40,9 +30,13 @@ enum {
     HWC_POWER_MODE_DOZE_SUSPEND  = 3,
 };
 
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+struct FramebufferState;
+class FrameBuffer {
+ public:
+  FrameBuffer(const char *name, uint32_t layer, int alpha, int *out_w, int *out_h);
+  ~FrameBuffer();
+  void set_power(int mode);
+  void swap();
+private:
+  FramebufferState *s;
+};

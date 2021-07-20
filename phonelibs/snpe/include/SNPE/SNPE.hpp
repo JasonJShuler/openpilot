@@ -1,6 +1,6 @@
 //==============================================================================
 //
-//  Copyright (c) 2015-2017 Qualcomm Technologies, Inc.
+//  Copyright (c) 2015-2020 Qualcomm Technologies, Inc.
 //  All Rights Reserved.
 //  Confidential and Proprietary - Qualcomm Technologies, Inc.
 //
@@ -8,9 +8,6 @@
 
 #ifndef _SNPE_SNPE_HPP_
 #define _SNPE_SNPE_HPP_
-
-#include <map>
-#include <vector>
 
 #include "DlSystem/DlOptional.hpp"
 #include "DlSystem/DlVersion.hpp"
@@ -82,6 +79,14 @@ public:
      */
    zdl::DlSystem::Optional<zdl::DlSystem::StringList>
       getOutputTensorNames() const noexcept;
+
+   /**
+    * @brief Gets the name of output tensor from the input layer name
+    *
+    * @return Output tensor name.
+    */
+   zdl::DlSystem::StringList
+      getOutputTensorNamesByLayerName(const char *name) const noexcept;
 
    /**
     * @brief Processes the input data and returns the output

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 from cereal import car
 from selfdrive.config import Conversions as CV
-from selfdrive.controls.lib.drive_helpers import create_event, EventTypes as ET
-from selfdrive.car.gm.values import CAR, Ecu, ECU_FINGERPRINT, CruiseButtons, \
-                                    SUPERCRUISE_CARS, NO_ASCM_CARS, AccState, FINGERPRINTS
-from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, is_ecu_disconnected, gen_empty_fingerprint
+from selfdrive.car.gm.values import CAR, CruiseButtons, \
+                                    AccState, NO_ASCM_CARS
+from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
 from selfdrive.car.interfaces import CarInterfaceBase
+from selfdrive.controls.lib.events import Events
+from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX
 
 ButtonType = car.CarState.ButtonEvent.Type
+EventName = car.CarEvent.EventName
+GearShifter = car.CarState.GearShifter
+MAX_CTRL_SPEED = (V_CRUISE_MAX + 4) * CV.KPH_TO_MS  # 135 + 4 = 86 mph
 
 class CarInterface(CarInterfaceBase):
 
@@ -16,31 +20,31 @@ class CarInterface(CarInterfaceBase):
     return float(accel) / 4.0
 
   @staticmethod
-  def get_params(candidate, fingerprint=gen_empty_fingerprint(), has_relay=False, car_fw=[]):
-    ret = CarInterfaceBase.get_std_params(candidate, fingerprint, has_relay)
+  def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=None):
+    ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
     ret.carName = "gm"
-    ret.safetyModel = car.CarParams.SafetyModel.gm  # default to gm
+    ret.safetyModel = car.CarParams.SafetyModel.gm
     ret.enableCruise = False  # stock cruise control is kept off
 
-    # GM port is considered a community feature, since it disables AEB;
+    # GM port is a community feature
     # TODO: make a port that uses a car harness and it only intercepts the camera
     ret.communityFeature = True
 
     # Presence of a camera on the object bus is ok.
     # Have to go to read_only if ASCM is online (ACC-enabled cars),
     # or camera is on powertrain bus (LKA cars without ACC).
-    ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.fwdCamera) or \
-                       has_relay or \
-                       candidate == CAR.CADILLAC_CT6
+    ret.enableCamera = True
     ret.openpilotLongitudinalControl = ret.enableCamera
     tire_stiffness_factor = 0.444  # not optimized yet
 
     # Start with a baseline lateral tuning for all GM vehicles. Override tuning as needed in each model section below.
+    ret.minSteerSpeed = 7 * CV.MPH_TO_MS
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
     ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.00]]
     ret.lateralTuning.pid.kf = 0.00004   # full torque for 20 deg at 80mph means 0.00007818594
-    ret.steerRateCost = 1.0
-    ret.steerActuatorDelay = 0.1  # Default delay, not measured yet
+    ret.steerRateCost = 0.5
+    ret.steerActuatorDelay = 0.  # Default delay, not measured yet
+
     ret.enableGasInterceptor = 0x201 in fingerprint[0]
     #TODO: this should be case based
     if ret.enableGasInterceptor:
@@ -53,35 +57,25 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.69
       ret.steerRatio = 15.7
       ret.steerRatioRear = 0.
-      ret.centerToFront = ret.wheelbase * 0.4 # wild guess
+      ret.centerToFront = ret.wheelbase * 0.4  # wild guess
 
     elif candidate == CAR.BOLT:
-      ret.minEnableSpeed = 25 * CV.MPH_TO_MS
-      if ret.enableGasInterceptor:
-        ret.minEnableSpeed = 5 * CV.MPH_TO_MS #steering works down to 5mph; pedal to 0
+      # initial engage unkown - copied from Volt. Stop and go unknown.
+      ret.minEnableSpeed = -1
+      ret.minSteerSpeed = 5 * CV.MPH_TO_MS
       ret.mass = 1616. + STD_CARGO_KG
       ret.safetyModel = car.CarParams.SafetyModel.gm
       ret.wheelbase = 2.60096
       ret.steerRatio = 16.8
       ret.steerRatioRear = 0.
-      ret.centerToFront = 2.0828 #ret.wheelbase * 0.4 # wild guess
-
-      #-----------------------------------------------------------------------------
-      # INDI
-      #-----------------------------------------------------------------------------
-      # timeconstant is smoothing. Higher values == more smoothing
-      # actuatoreffectiveness is how much it steers. Lower values == more steering
-      # outer and inner are gains. Higher values = more steering
-      #
-      # JJS - removing tuning as it was causing lane crossing
-      #ret.steerActuatorDelay = 0.15
-      #ret.lateralTuning.init('indi')
-      #ret.lateralTuning.indi.innerLoopGain = 4.57 # rate error gain
-      #ret.lateralTuning.indi.outerLoopGain = 13.1 # error gain
-      #ret.lateralTuning.indi.timeConstant = 5.5
-      #ret.lateralTuning.indi.actuatorEffectiveness = 6.79
-
-      tire_stiffness_factor = 1.0
+      ret.centerToFront = 2.0828 
+      #PID tunning not to prevent oversteer
+      ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kiBP = [[10., 41.0], [10., 41.0]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.18, 0.26], [0.01, 0.02]]
+      ret.lateralTuning.pid.kdBP = [0.]
+      ret.lateralTuning.pid.kdV = [0.3]  #corolla from shane fork : 0.725
+      ret.lateralTuning.pid.kf = 0.000045
+      tire_stiffness_factor = 0.5
 
     elif candidate == CAR.MALIBU:
       # supports stop and go, but initial engage must be above 18mph (which include conservatism)
@@ -90,7 +84,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.83
       ret.steerRatio = 15.8
       ret.steerRatioRear = 0.
-      ret.centerToFront = ret.wheelbase * 0.4 # wild guess
+      ret.centerToFront = ret.wheelbase * 0.4  # wild guess
 
     elif candidate == CAR.HOLDEN_ASTRA:
       ret.mass = 1363. + STD_CARGO_KG
@@ -102,38 +96,20 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatioRear = 0.
 
     elif candidate == CAR.ACADIA:
-      ret.minEnableSpeed = -1. # engage speed is decided by pcm
+      ret.minEnableSpeed = -1.  # engage speed is decided by pcm
       ret.mass = 4353. * CV.LB_TO_KG + STD_CARGO_KG
       ret.wheelbase = 2.86
-      ret.steerRatio = 14.4  #end to end is 13.46
+      ret.steerRatio = 14.4  # end to end is 13.46
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.4
 
     elif candidate == CAR.BUICK_REGAL:
       ret.minEnableSpeed = 18 * CV.MPH_TO_MS
-      ret.mass = 3779. * CV.LB_TO_KG + STD_CARGO_KG # (3849+3708)/2
-      ret.wheelbase = 2.83 #111.4 inches in meters
-      ret.steerRatio = 14.4 # guess for tourx
+      ret.mass = 3779. * CV.LB_TO_KG + STD_CARGO_KG  # (3849+3708)/2
+      ret.wheelbase = 2.83  # 111.4 inches in meters
+      ret.steerRatio = 14.4  # guess for tourx
       ret.steerRatioRear = 0.
-      ret.centerToFront = ret.wheelbase * 0.4 # guess for tourx
-
-    elif candidate == CAR.EQUINOX:
-      ret.minEnableSpeed = 18 * CV.MPH_TO_MS
-      ret.mass = 3500. * CV.LB_TO_KG + STD_CARGO_KG # (3849+3708)/2
-      ret.safetyModel = car.CarParams.SafetyModel.gm
-      ret.wheelbase = 2.72 #107.3 inches in meters
-      ret.steerRatio = 14.4 # guess for tourx
-      ret.steerRatioRear = 0. # unknown online
-      ret.centerToFront = ret.wheelbase * 0.4 # wild guess
-
-    elif candidate == CAR.TAHOE:
-      ret.minEnableSpeed = 18 * CV.MPH_TO_MS
-      ret.mass = 5602. * CV.LB_TO_KG + STD_CARGO_KG # (3849+3708)/2
-      ret.safetyModel = car.CarParams.SafetyModel.gm
-      ret.wheelbase = 2.95 #116 inches in meters
-      ret.steerRatio = 17.3 # guess for tourx
-      ret.steerRatioRear = 0. # unknown online
-      ret.centerToFront = 2.59  # ret.wheelbase * 0.4 # wild guess
+      ret.centerToFront = ret.wheelbase * 0.4  # guess for tourx
 
     elif candidate == CAR.CADILLAC_ATS:
       ret.minEnableSpeed = 18 * CV.MPH_TO_MS
@@ -142,16 +118,6 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 15.3
       ret.steerRatioRear = 0.
       ret.centerToFront = ret.wheelbase * 0.49
-
-    elif candidate == CAR.CADILLAC_CT6:
-      # engage speed is decided by pcm
-      ret.minEnableSpeed = -1.
-      ret.mass = 4016. * CV.LB_TO_KG + STD_CARGO_KG
-      ret.safetyModel = car.CarParams.SafetyModel.cadillac
-      ret.wheelbase = 3.11
-      ret.steerRatio = 14.6   # it's 16.3 without rear active steering
-      ret.steerRatioRear = 0. # TODO: there is RAS on this car!
-      ret.centerToFront = ret.wheelbase * 0.465
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -162,17 +128,34 @@ class CarInterface(CarInterfaceBase):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront,
                                                                          tire_stiffness_factor=tire_stiffness_factor)
 
-    ret.longitudinalTuning.kpBP = [5., 35.]
-    ret.longitudinalTuning.kpV = [2.4, 1.5]
-    ret.longitudinalTuning.kiBP = [0.]
-    ret.longitudinalTuning.kiV = [0.36]
+    ret.longitudinalTuning.kpBP = [0., 5., 35.]
+    ret.longitudinalTuning.kiBP = [0., 35.]
+
+    if ret.enableGasInterceptor and candidate == CAR.BOLT:
+      # TODO: Move this to before cars, and put the Bolt-specific tuning in its category.
+      # Assumes the Bolt is using L-Mode for regen braking.
+      ret.gasMaxBP = [0.0, 5.0, 9.0, 35.0]
+      ret.gasMaxV =  [0.4, 0.5, 0.7, 0.7]
+      ret.longitudinalTuning.kpBP = [0.0, 5.0, 10.0, 20.0, 35.0]
+      ret.longitudinalTuning.kpV = [0.6, 0.95, 1.19, 1.27, 1.18]
+      ret.longitudinalTuning.kiV = [0.31, 0.26]
+    elif ret.enableGasInterceptor:
+      # Use the defaults:
+      ret.gasMaxBP = [0., 9., 35]
+      ret.gasMaxV = [0.2, 0.5, 0.7]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
+    else:
+      ret.gasMaxBP = [0.]
+      ret.gasMaxV = [0.5]
+      ret.longitudinalTuning.kpV = [3.6, 2.4, 1.5]
+      ret.longitudinalTuning.kiV = [0.54, 0.36]
 
     ret.stoppingControl = True
     ret.startAccel = 0.8
 
     ret.steerLimitTimer = 0.4
     ret.radarTimeStep = 0.0667  # GM radar runs at 15Hz instead of standard 20Hz
-
     return ret
 
   # returns a car.CarState
@@ -181,12 +164,14 @@ class CarInterface(CarInterfaceBase):
 
     ret = self.CS.update(self.cp)
 
+    ret.cruiseState.enabled = self.CS.main_on
+
+
     ret.canValid = self.cp.can_valid
-    ret.yawRate = self.VM.yaw_rate(ret.steeringAngle * CV.DEG_TO_RAD, ret.vEgo)
     ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
 
     buttonEvents = []
-    
+
     if self.CS.cruise_buttons != self.CS.prev_cruise_buttons and self.CS.prev_cruise_buttons != CruiseButtons.INIT:
       be = car.CarState.ButtonEvent.new_message()
       be.type = ButtonType.unknown
@@ -197,63 +182,82 @@ class CarInterface(CarInterfaceBase):
         be.pressed = False
         but = self.CS.prev_cruise_buttons
       if but == CruiseButtons.RES_ACCEL:
-        if not (ret.cruiseState.enabled and ret.standstill):
-          be.type = ButtonType.accelCruise # Suppress resume button if we're resuming from stop so we don't adjust speed.
+        be.type = ButtonType.accelCruise
       elif but == CruiseButtons.DECEL_SET:
         be.type = ButtonType.decelCruise
       elif but == CruiseButtons.CANCEL:
-        if not self.CP.enableGasInterceptor: #need to use cancel to disable cc with Pedal
-          be.type = ButtonType.cancel
+        be.type = ButtonType.cancel
       elif but == CruiseButtons.MAIN:
-        be.type = ButtonType.altButton3
+        if not self.CP.enableGasInterceptor:
+          be.type = ButtonType.altButton3
       buttonEvents.append(be)
 
     ret.buttonEvents = buttonEvents
 
     events = self.create_common_events(ret)
 
-    if self.CS.car_fingerprint in SUPERCRUISE_CARS:
-      if ret.cruiseState.enabled and not self.cruise_enabled_prev:
-        events.append(create_event('pcmEnable', [ET.ENABLE]))
-      if not ret.cruiseState.enabled:
-        events.append(create_event('pcmDisable', [ET.USER_DISABLE]))
+    if ret.vEgo < self.CP.minEnableSpeed:
+      events.add(EventName.belowEngageSpeed)
+    if self.CS.park_brake:
+      events.add(EventName.parkBrake)
+    if ret.vEgo < self.CP.minSteerSpeed:
+      events.add(car.CarEvent.EventName.belowSteerSpeed)
 
-    else:
-      # TODO: why is this only not supercruise? ignore supercruise?
-      if ret.vEgo < self.CP.minEnableSpeed:
-        events.append(create_event('speedTooLow', [ET.NO_ENTRY]))
-      if self.CS.park_brake:
-        events.append(create_event('parkBrake', [ET.NO_ENTRY, ET.USER_DISABLE]))
-      # disable on pedals rising edge or when brake is pressed and speed isn't zero
-      if (ret.gasPressed and not self.gas_pressed_prev and not self.CP.enableGasInterceptor) or \
-        (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
-        events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
-      if ret.cruiseState.standstill:
-        events.append(create_event('resumeRequired', [ET.WARNING]))
-      if not self.CS.car_fingerprint in NO_ASCM_CARS:
-        if self.CS.pcm_acc_status == AccState.FAULTED:
-          events.append(create_event('controlsFailed', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
-
-      # handle button presses
-      for b in ret.buttonEvents:
-        # do enable on both accel and decel buttons
-        if b.type in [ButtonType.accelCruise, ButtonType.decelCruise] and not b.pressed:
-          events.append(create_event('buttonEnable', [ET.ENABLE]))
-        # do disable on button down
-        if b.type == ButtonType.cancel and b.pressed:
-          events.append(create_event('buttonCancel', [ET.USER_DISABLE]))
-
-    ret.events = events
-
-    # update previous brake/gas pressed
-    self.cruise_enabled_prev = ret.cruiseState.enabled
-    self.gas_pressed_prev = ret.gasPressed
-    self.brake_pressed_prev = ret.brakePressed
+    # handle button presses
+    for b in ret.buttonEvents:
+      # do enable on both accel and decel buttons
+      if b.type in [ButtonType.accelCruise, ButtonType.decelCruise] and not b.pressed:
+        events.add(EventName.buttonEnable)
+      # do disable on button down
+      if b.type == ButtonType.cancel and b.pressed:
+        events.add(EventName.buttonCancel)
+    ret.events = events.to_msg()
 
     # copy back carState packet to CS
     self.CS.out = ret.as_reader()
 
     return self.CS.out
+
+  # Override create_common_events locally to handle a special case for the Bolt EV.
+  def create_common_events(self, cs_out, extra_gears=[], gas_resume_speed=-1):  # pylint: disable=dangerous-default-value
+    events = Events()
+
+    if cs_out.doorOpen:
+      events.add(EventName.doorOpen)
+    if cs_out.seatbeltUnlatched:
+      events.add(EventName.seatbeltNotLatched)
+    if cs_out.gearShifter != GearShifter.drive and cs_out.gearShifter not in extra_gears:
+      events.add(EventName.wrongGear)
+    if cs_out.gearShifter == GearShifter.reverse:
+      events.add(EventName.reverseGear)
+    if not cs_out.cruiseState.available:
+      events.add(EventName.wrongCarMode)
+    if cs_out.espDisabled:
+      events.add(EventName.espDisabled)
+    if cs_out.stockFcw:
+      events.add(EventName.stockFcw)
+    if cs_out.stockAeb:
+      events.add(EventName.stockAeb)
+    if cs_out.vEgo > MAX_CTRL_SPEED:
+      events.add(EventName.speedTooHigh)
+
+    if cs_out.steerError:
+      events.add(EventName.steerUnavailable)
+    elif cs_out.steerWarning:
+      events.add(EventName.steerTempUnavailable)
+
+    # Disable on rising edge of gas or brake. Also disable on brake when speed > 0.
+    if cs_out.brakePressed and (not self.CS.out.brakePressed or not cs_out.standstill):
+      events.add(EventName.pedalPressed)
+    # For the Bolt EV, we want OP to manage cruise state when there's a pedal 
+    # interceptor, so ignore these events
+    if not (self.CP.enableGasInterceptor and self.CP.carFingerprint in NO_ASCM_CARS):
+      if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
+        events.add(EventName.pcmEnable)
+      elif not cs_out.cruiseState.enabled:
+        events.add(EventName.pcmDisable)
+
+    return events
 
   def apply(self, c):
     hud_v_cruise = c.hudControl.setSpeed
@@ -261,16 +265,8 @@ class CarInterface(CarInterfaceBase):
       hud_v_cruise = 0
 
     # For Openpilot, "enabled" includes pre-enable.
-    # In GM, PCM faults out if ACC command overlaps user gas.
-    # jjs disabling for now as we have no ACC
-
-    #todo: see if we can make conditional on pedal
-    # enabled = c.enabled and not self.CS.out.gasPressed
-    enabled = c.enabled
-
-    can_sends = self.CC.update(enabled, self.CS, self.frame, \
-                               c.actuators,
-                               hud_v_cruise, c.hudControl.lanesVisible, \
+    can_sends = self.CC.update(c.enabled, self.CS, self.frame, c.actuators,
+                               hud_v_cruise, c.hudControl.lanesVisible,
                                c.hudControl.leadVisible, c.hudControl.visualAlert)
 
     self.frame += 1

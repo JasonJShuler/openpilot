@@ -3,24 +3,34 @@ import os
 import sys
 import threading
 import capnp
-from selfdrive.version import version, dirty
+from selfdrive.version import version, dirty, origin, branch
 
+from selfdrive.hardware import PC
 from selfdrive.swaglog import cloudlog
 
-if os.getenv("NOLOG") or os.getenv("NOCRASH"):
-  def capture_exception(*exc_info):
+if os.getenv("NOLOG") or os.getenv("NOCRASH") or PC:
+  def capture_exception(*args, **kwargs):
     pass
+
   def bind_user(**kwargs):
     pass
+
   def bind_extra(**kwargs):
     pass
+
   def install():
     pass
 else:
   from raven import Client
   from raven.transport.http import HTTPTransport
+
+  tags = {
+    'dirty': dirty,
+    'origin': origin,
+    'branch': branch
+  }
   client = Client('https://1994756b5e6f41cf939a4c65de45f4f2:cefebaf3a8aa40d182609785f7189bd7@app.getsentry.com/77924',
-                  install_sys_hook=False, transport=HTTPTransport, release=version, tags={'dirty': dirty})
+                  install_sys_hook=False, transport=HTTPTransport, release=version, tags=tags)
 
   def capture_exception(*args, **kwargs):
     exc_info = sys.exc_info()
@@ -35,20 +45,21 @@ else:
     client.extra_context(kwargs)
 
   def install():
-    # installs a sys.excepthook
-    __excepthook__ = sys.excepthook
-    def handle_exception(*exc_info):
-      if exc_info[0] not in (KeyboardInterrupt, SystemExit):
-        capture_exception(exc_info=exc_info)
-      __excepthook__(*exc_info)
-    sys.excepthook = handle_exception
-
     """
     Workaround for `sys.excepthook` thread bug from:
     http://bugs.python.org/issue1230540
     Call once from the main thread before creating any threads.
     Source: https://stackoverflow.com/a/31622038
     """
+    # installs a sys.excepthook
+    __excepthook__ = sys.excepthook
+
+    def handle_exception(*exc_info):
+      if exc_info[0] not in (KeyboardInterrupt, SystemExit):
+        capture_exception()
+      __excepthook__(*exc_info)
+    sys.excepthook = handle_exception
+
     init_original = threading.Thread.__init__
 
     def init(self, *args, **kwargs):

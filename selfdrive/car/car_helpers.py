@@ -1,25 +1,39 @@
 import os
 from common.params import Params
 from common.basedir import BASEDIR
+from selfdrive.version import comma_remote, tested_branch
 from selfdrive.car.fingerprints import eliminate_incompatible_cars, all_known_cars
 from selfdrive.car.vin import get_vin, VIN_UNKNOWN
 from selfdrive.car.fw_versions import get_fw_versions, match_fw_to_car
+from selfdrive.hardware import EON
 from selfdrive.swaglog import cloudlog
 import cereal.messaging as messaging
 from selfdrive.car import gen_empty_fingerprint
 
 from cereal import car
+EventName = car.CarEvent.EventName
 
-def get_startup_alert(car_recognized, controller_available):
-  alert = 'startup'
-  if Params().get("GitRemote", encoding="utf8") in ['git@github.com:commaai/openpilot.git', 'https://github.com/commaai/openpilot.git']:
-    if Params().get("GitBranch", encoding="utf8") not in ['devel', 'release2-staging', 'dashcam-staging', 'release2', 'dashcam']:
-      alert = 'startupMaster'
+
+def get_startup_event(car_recognized, controller_available):
+  if comma_remote and tested_branch:
+    event = EventName.startup
+  else:
+    event = EventName.startupMaster
+
   if not car_recognized:
-    alert = 'startupNoCar'
+    event = EventName.startupNoCar
   elif car_recognized and not controller_available:
-    alert = 'startupNoControl'
-  return alert
+    event = EventName.startupNoControl
+  elif EON and "letv" not in open("/proc/cmdline").read():
+    event = EventName.startupOneplus
+  return event
+
+
+def get_one_can(logcan):
+  while True:
+    can = messaging.recv_one_retry(logcan)
+    if len(can.can) > 0:
+      return can
 
 
 def load_interfaces(brand_names):
@@ -27,12 +41,17 @@ def load_interfaces(brand_names):
   for brand_name in brand_names:
     path = ('selfdrive.car.%s' % brand_name)
     CarInterface = __import__(path + '.interface', fromlist=['CarInterface']).CarInterface
-    if os.path.exists(BASEDIR + '/' + path.replace('.', '/') + '/carcontroller.py'):
-      CarController = __import__(path + '.carcontroller', fromlist=['CarController']).CarController
+
+    if os.path.exists(BASEDIR + '/' + path.replace('.', '/') + '/carstate.py'):
       CarState = __import__(path + '.carstate', fromlist=['CarState']).CarState
     else:
-      CarController = None
       CarState = None
+
+    if os.path.exists(BASEDIR + '/' + path.replace('.', '/') + '/carcontroller.py'):
+      CarController = __import__(path + '.carcontroller', fromlist=['CarController']).CarController
+    else:
+      CarController = None
+
     for model_name in brand_names[brand_name]:
       ret[model_name] = (CarInterface, CarController, CarState)
   return ret
@@ -65,8 +84,11 @@ def only_toyota_left(candidate_cars):
 
 
 # **** for use live only ****
-def fingerprint(logcan, sendcan, has_relay):
-  if has_relay:
+def fingerprint(logcan, sendcan):
+  fixed_fingerprint = os.environ.get('FINGERPRINT', "")
+  skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
+
+  if not fixed_fingerprint and not skip_fw_query:
     # Vin query only reliably works thorugh OBDII
     bus = 1
 
@@ -76,7 +98,7 @@ def fingerprint(logcan, sendcan, has_relay):
       if cached_params.carName == "mock":
         cached_params = None
 
-    if cached_params is not None:
+    if cached_params is not None and len(cached_params.carFw) > 0 and cached_params.carVin is not VIN_UNKNOWN:
       cloudlog.warning("Using cached CarParams")
       vin = cached_params.carVin
       car_fw = list(cached_params.carFw)
@@ -101,7 +123,7 @@ def fingerprint(logcan, sendcan, has_relay):
   done = False
 
   while not done:
-    a = messaging.get_one_can(logcan)
+    a = get_one_can(logcan)
 
     for can in a.can:
       # need to independently try to fingerprint both bus 0 and 1 to work
@@ -122,8 +144,7 @@ def fingerprint(logcan, sendcan, has_relay):
       # Toyota needs higher time to fingerprint, since DSU does not broadcast immediately
       if only_toyota_left(candidate_cars[b]):
         frame_fingerprint = 100  # 1s
-      if len(candidate_cars[b]) == 1:
-        if frame > frame_fingerprint:
+      if len(candidate_cars[b]) == 1 and frame > frame_fingerprint:
           # fingerprint done
           car_fingerprint = candidate_cars[b][0]
 
@@ -141,8 +162,7 @@ def fingerprint(logcan, sendcan, has_relay):
     car_fingerprint = list(fw_candidates)[0]
     source = car.CarParams.FingerprintSource.fw
 
-  fixed_fingerprint = os.environ.get('FINGERPRINT', "")
-  if len(fixed_fingerprint):
+  if fixed_fingerprint:
     car_fingerprint = fixed_fingerprint
     source = car.CarParams.FingerprintSource.fixed
 
@@ -150,15 +170,15 @@ def fingerprint(logcan, sendcan, has_relay):
   return car_fingerprint, finger, vin, car_fw, source
 
 
-def get_car(logcan, sendcan, has_relay=False):
-  candidate, fingerprints, vin, car_fw, source = fingerprint(logcan, sendcan, has_relay)
+def get_car(logcan, sendcan):
+  candidate, fingerprints, vin, car_fw, source = fingerprint(logcan, sendcan)
 
   if candidate is None:
     cloudlog.warning("car doesn't match any fingerprints: %r", fingerprints)
     candidate = "mock"
 
   CarInterface, CarController, CarState = interfaces[candidate]
-  car_params = CarInterface.get_params(candidate, fingerprints, has_relay, car_fw)
+  car_params = CarInterface.get_params(candidate, fingerprints, car_fw)
   car_params.carVin = vin
   car_params.carFw = car_fw
   car_params.fingerprintSource = source

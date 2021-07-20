@@ -1,17 +1,25 @@
-#ifndef __SOUND_HPP
-#define __SOUND_HPP
+#pragma once
+#include <map>
+#include "cereal/gen/cpp/log.capnp.h"
 
-#include "cereal/gen/c/log.capnp.h"
+typedef cereal::CarControl::HUDControl::AudibleAlert AudibleAlert;
 
-typedef enum cereal_CarControl_HUDControl_AudibleAlert AudibleAlert;
+static std::map<AudibleAlert, std::pair<const char *, int>> sound_map {
+  // AudibleAlert, (file path, loop count)
+  {AudibleAlert::CHIME_DISENGAGE, {"../assets/sounds/disengaged.wav", 0}},
+  {AudibleAlert::CHIME_ENGAGE, {"../assets/sounds/engaged.wav", 0}},
+  {AudibleAlert::CHIME_WARNING1, {"../assets/sounds/warning_1.wav", 0}},
+  {AudibleAlert::CHIME_WARNING2, {"../assets/sounds/warning_2.wav", 0}},
+  {AudibleAlert::CHIME_WARNING2_REPEAT, {"../assets/sounds/warning_2.wav", 3}},
+  {AudibleAlert::CHIME_WARNING_REPEAT, {"../assets/sounds/warning_repeat.wav", -1}},
+  {AudibleAlert::CHIME_ERROR, {"../assets/sounds/error.wav", 0}},
+  {AudibleAlert::CHIME_PROMPT, {"../assets/sounds/error.wav", 0}}
+};
 
-void ui_sound_init();
-void ui_sound_destroy();
-
-void set_volume(int volume);
-
-void play_alert_sound(AudibleAlert alert);
-void stop_alert_sound(AudibleAlert alert);
-
-#endif
-
+class Sound {
+public:
+  virtual ~Sound() {}
+  virtual bool play(AudibleAlert alert) = 0;
+  virtual void stop() = 0;
+  virtual void setVolume(int volume) = 0;
+};

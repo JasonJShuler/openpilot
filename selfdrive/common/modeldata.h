@@ -1,40 +1,18 @@
-#ifndef MODELDATA_H
-#define MODELDATA_H
+#pragma once
+const int  TRAJECTORY_SIZE = 33;
+const float MIN_DRAW_DISTANCE = 10.0;
+const float MAX_DRAW_DISTANCE = 100.0;
 
-#define MODEL_PATH_DISTANCE 192
-#define POLYFIT_DEGREE 4
-#define SPEED_PERCENTILES 10
-#define DESIRE_PRED_SIZE 32
-#define OTHER_META_SIZE 4
-
-typedef struct PathData {
-  float points[MODEL_PATH_DISTANCE];
-  float prob;
-  float std;
-  float stds[MODEL_PATH_DISTANCE];
-  float poly[POLYFIT_DEGREE];
-} PathData;
-
-typedef struct LeadData {
-  float dist;
-  float prob;
-  float std;
-  float rel_y;
-  float rel_y_std;
-  float rel_v;
-  float rel_v_std;
-  float rel_a;
-  float rel_a_std;
-} LeadData;
-
-typedef struct ModelData {
-  PathData path;
-  PathData left_lane;
-  PathData right_lane;
-  LeadData lead;
-  LeadData lead_future;
-  float meta[OTHER_META_SIZE + DESIRE_PRED_SIZE];
-  float speed[SPEED_PERCENTILES];
-} ModelData;
-
-#endif
+const double T_IDXS[TRAJECTORY_SIZE] = {0.        ,  0.00976562,  0.0390625 ,  0.08789062,  0.15625   ,
+        0.24414062,  0.3515625 ,  0.47851562,  0.625     ,  0.79101562,
+        0.9765625 ,  1.18164062,  1.40625   ,  1.65039062,  1.9140625 ,
+        2.19726562,  2.5       ,  2.82226562,  3.1640625 ,  3.52539062,
+        3.90625   ,  4.30664062,  4.7265625 ,  5.16601562,  5.625     ,
+        6.10351562,  6.6015625 ,  7.11914062,  7.65625   ,  8.21289062,
+        8.7890625 ,  9.38476562, 10.};
+const double X_IDXS[TRAJECTORY_SIZE] = { 0.    ,   0.1875,   0.75  ,   1.6875,   3.    ,   4.6875,
+         6.75  ,   9.1875,  12.    ,  15.1875,  18.75  ,  22.6875,
+        27.    ,  31.6875,  36.75  ,  42.1875,  48.    ,  54.1875,
+        60.75  ,  67.6875,  75.    ,  82.6875,  90.75  ,  99.1875,
+       108.    , 117.1875, 126.75  , 136.6875, 147.    , 157.6875,
+       168.75  , 180.1875, 192.};

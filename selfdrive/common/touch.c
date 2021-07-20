@@ -10,6 +10,13 @@
 
 #include "touch.h"
 
+/* this macro is used to tell if "bit" is set in "array"
+ * it selects a byte from the array, and does a boolean AND
+ * operation with a byte that only has the relevant bit set.
+ * eg. to check for the 12th bit, we do (array[1] & 1<<4)
+ */
+#define test_bit(bit, array)    (array[bit/8] & (1<<(bit%8)))
+
 static int find_dev() {
   int err;
 
@@ -28,10 +35,7 @@ static int find_dev() {
     err = ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(ev_bits)), ev_bits);
     assert(err >= 0);
 
-    const int x_key = ABS_MT_POSITION_X / 8;
-    const int y_key = ABS_MT_POSITION_Y / 8;
-    if ((ev_bits[x_key] & (ABS_MT_POSITION_X - x_key)) &&
-        (ev_bits[y_key] & (ABS_MT_POSITION_Y - y_key))) {
+    if (test_bit(ABS_MT_POSITION_X, ev_bits) && test_bit(ABS_MT_POSITION_Y, ev_bits)) {
       ret = fd;
       break;
     }
@@ -82,34 +86,6 @@ int touch_poll(TouchState *s, int* out_x, int* out_y, int timeout) {
     default:
       break;
     }
-  }
-  if (up) {
-    // adjust for flippening
-    *out_x = s->last_y;
-    *out_y = 1080 - s->last_x;
-  }
-  return up;
-}
-
-int touch_read(TouchState *s, int* out_x, int* out_y) {
-  assert(out_x && out_y);
-  struct input_event event;
-  int err = read(s->fd, &event, sizeof(event));
-  if (err < sizeof(event)) {
-    return -1;
-  }
-  bool up = false;
-  switch (event.type) {
-  case EV_ABS:
-    if (event.code == ABS_MT_POSITION_X) {
-      s->last_x = event.value;
-    } else if (event.code == ABS_MT_POSITION_Y) {
-      s->last_y = event.value;
-    }
-    up = true;
-    break;
-  default:
-    break;
   }
   if (up) {
     // adjust for flippening

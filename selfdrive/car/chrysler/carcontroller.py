@@ -1,23 +1,20 @@
 from selfdrive.car import apply_toyota_steer_torque_limits
 from selfdrive.car.chrysler.chryslercan import create_lkas_hud, create_lkas_command, \
                                                create_wheel_buttons
-from selfdrive.car.chrysler.values import CAR, SteerLimitParams
+from selfdrive.car.chrysler.values import CAR, CarControllerParams
 from opendbc.can.packer import CANPacker
 
 class CarController():
   def __init__(self, dbc_name, CP, VM):
-    self.braking = False
     self.apply_steer_last = 0
     self.ccframe = 0
     self.prev_frame = -1
     self.hud_count = 0
     self.car_fingerprint = CP.carFingerprint
-    self.alert_active = False
     self.gone_fast_yet = False
     self.steer_rate_limited = False
 
     self.packer = CANPacker(dbc_name)
-
 
   def update(self, enabled, CS, actuators, pcm_cancel_cmd, hud_alert):
     # this seems needed to avoid steering faults and to force the sync with the EPS counter
@@ -27,9 +24,9 @@ class CarController():
 
     # *** compute control surfaces ***
     # steer torque
-    new_steer = actuators.steer * SteerLimitParams.STEER_MAX
+    new_steer = actuators.steer * CarControllerParams.STEER_MAX
     apply_steer = apply_toyota_steer_torque_limits(new_steer, self.apply_steer_last,
-                                                   CS.out.steeringTorqueEps, SteerLimitParams)
+                                                   CS.out.steeringTorqueEps, CarControllerParams)
     self.steer_rate_limited = new_steer != apply_steer
 
     moving_fast = CS.out.vEgo > CS.CP.minSteerSpeed  # for status message
@@ -51,7 +48,7 @@ class CarController():
 
     if pcm_cancel_cmd:
       # TODO: would be better to start from frame_2b3
-      new_msg = create_wheel_buttons(self.ccframe)
+      new_msg = create_wheel_buttons(self.packer, self.ccframe, cancel=True)
       can_sends.append(new_msg)
 
     # LKAS_HEARTBIT is forwarded by Panda so no need to send it here.

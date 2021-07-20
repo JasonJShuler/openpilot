@@ -84,6 +84,7 @@ __kernel void debayer10(__global uchar const * const in,
       // 64 is the black level of the sensor, remove
       // (changed to 56 for HDR)
       const float black_level = 56.0f;
+      // TODO: switch to max here?
       p = (p - black_level);
 
       // correct vignetting (no pow function?)

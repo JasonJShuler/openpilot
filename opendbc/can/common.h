@@ -13,6 +13,8 @@
 // Helper functions
 unsigned int honda_checksum(unsigned int address, uint64_t d, int l);
 unsigned int toyota_checksum(unsigned int address, uint64_t d, int l);
+unsigned int subaru_checksum(unsigned int address, uint64_t d, int l);
+unsigned int chrysler_checksum(unsigned int address, uint64_t d, int l);
 void init_crc_lookup_tables();
 unsigned int volkswagen_crc(unsigned int address, uint64_t d, int l);
 unsigned int pedal_checksum(uint64_t d, int l);
@@ -54,7 +56,7 @@ public:
             const std::vector<SignalParseOptions> &sigoptions);
   void UpdateCans(uint64_t sec, const capnp::List<cereal::CanData>::Reader& cans);
   void UpdateValid(uint64_t sec);
-  void update_string(std::string data, bool sendcan);
+  void update_string(const std::string &data, bool sendcan);
   std::vector<SignalValue> query_latest();
 };
 

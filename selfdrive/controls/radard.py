@@ -7,7 +7,7 @@ import cereal.messaging as messaging
 from cereal import car
 from common.numpy_fast import interp
 from common.params import Params
-from common.realtime import Ratekeeper, set_realtime_priority
+from common.realtime import Ratekeeper, Priority, config_realtime_process
 from selfdrive.config import RADAR_TO_CAMERA
 from selfdrive.controls.lib.cluster.fastcluster_py import cluster_points_centroid
 from selfdrive.controls.lib.radar_helpers import Cluster, Track
@@ -37,12 +37,12 @@ def laplacian_cdf(x, mu, b):
 
 def match_vision_to_cluster(v_ego, lead, clusters):
   # match vision point to best statistical cluster match
-  offset_vision_dist = lead.dist - RADAR_TO_CAMERA
+  offset_vision_dist = lead.xyva[0] - RADAR_TO_CAMERA
 
   def prob(c):
-    prob_d = laplacian_cdf(c.dRel, offset_vision_dist, lead.std)
-    prob_y = laplacian_cdf(c.yRel, lead.relY, lead.relYStd)
-    prob_v = laplacian_cdf(c.vRel, lead.relVel, lead.relVelStd)
+    prob_d = laplacian_cdf(c.dRel, offset_vision_dist, lead.xyvaStd[0])
+    prob_y = laplacian_cdf(c.yRel, -lead.xyva[1], lead.xyvaStd[1])
+    prob_v = laplacian_cdf(c.vRel, lead.xyva[2], lead.xyvaStd[2])
 
     # This is isn't exactly right, but good heuristic
     return prob_d * prob_y * prob_v
@@ -52,7 +52,7 @@ def match_vision_to_cluster(v_ego, lead, clusters):
   # if no 'sane' match is found return -1
   # stationary radar points can be false positives
   dist_sane = abs(cluster.dRel - offset_vision_dist) < max([(offset_vision_dist)*.25, 5.0])
-  vel_sane = (abs(cluster.vRel - lead.relVel) < 10) or (v_ego + cluster.vRel > 2)
+  vel_sane = (abs(cluster.vRel - lead.xyva[2]) < 10) or (v_ego + cluster.vRel > 3)
   if dist_sane and vel_sane:
     return cluster
   else:
@@ -91,25 +91,19 @@ class RadarD():
     self.tracks = defaultdict(dict)
     self.kalman_params = KalmanParams(radar_ts)
 
-    self.last_md_ts = 0
-    self.last_controls_state_ts = 0
-
-    self.active = 0
-
     # v_ego
     self.v_ego = 0.
     self.v_ego_hist = deque([0], maxlen=delay+1)
 
     self.ready = False
 
-  def update(self, frame, sm, rr, has_radar):
-    self.current_time = 1e-9*max([sm.logMonoTime[key] for key in sm.logMonoTime.keys()])
+  def update(self, sm, rr, enable_lead):
+    self.current_time = 1e-9*max(sm.logMonoTime.values())
 
-    if sm.updated['controlsState']:
-      self.active = sm['controlsState'].active
-      self.v_ego = sm['controlsState'].vEgo
+    if sm.updated['carState']:
+      self.v_ego = sm['carState'].vEgo
       self.v_ego_hist.append(self.v_ego)
-    if sm.updated['model']:
+    if sm.updated['modelV2']:
       self.ready = True
 
     ar_pts = {}
@@ -135,7 +129,6 @@ class RadarD():
 
     idens = list(sorted(self.tracks.keys()))
     track_pts = list([self.tracks[iden].get_key_for_cluster() for iden in idens])
-
 
     # If we have multiple points, cluster them
     if len(track_pts) > 1:
@@ -163,23 +156,24 @@ class RadarD():
         self.tracks[idens[idx]].reset_a_lead(aLeadK, aLeadTau)
 
     # *** publish radarState ***
-    dat = messaging.new_message()
-    dat.init('radarState')
-    dat.valid = sm.all_alive_and_valid(service_list=['controlsState', 'model'])
-    dat.radarState.mdMonoTime = self.last_md_ts
-    dat.radarState.canMonoTimes = list(rr.canMonoTimes)
-    dat.radarState.radarErrors = list(rr.errors)
-    dat.radarState.controlsStateMonoTime = self.last_controls_state_ts
+    dat = messaging.new_message('radarState')
+    dat.valid = sm.all_alive_and_valid() and len(rr.errors) == 0
+    radarState = dat.radarState
+    radarState.mdMonoTime = sm.logMonoTime['modelV2']
+    radarState.canMonoTimes = list(rr.canMonoTimes)
+    radarState.radarErrors = list(rr.errors)
+    radarState.carStateMonoTime = sm.logMonoTime['carState']
 
-    if has_radar:
-      dat.radarState.leadOne = get_lead(self.v_ego, self.ready, clusters, sm['model'].lead, low_speed_override=True)
-      dat.radarState.leadTwo = get_lead(self.v_ego, self.ready, clusters, sm['model'].leadFuture, low_speed_override=False)
+    if enable_lead:
+      if len(sm['modelV2'].leads) > 1:
+        radarState.leadOne = get_lead(self.v_ego, self.ready, clusters, sm['modelV2'].leads[0], low_speed_override=True)
+        radarState.leadTwo = get_lead(self.v_ego, self.ready, clusters, sm['modelV2'].leads[1], low_speed_override=False)
     return dat
 
 
 # fuses camera and radar data for best lead detection
 def radard_thread(sm=None, pm=None, can_sock=None):
-  set_realtime_priority(2)
+  config_realtime_process(2, Priority.CTRL_LOW)
 
   # wait for stats about the car to come in from controls
   cloudlog.info("radard is waiting for CarParams")
@@ -190,13 +184,11 @@ def radard_thread(sm=None, pm=None, can_sock=None):
   cloudlog.info("radard is importing %s", CP.carName)
   RadarInterface = importlib.import_module('selfdrive.car.%s.radar_interface' % CP.carName).RadarInterface
 
+  # *** setup messaging
   if can_sock is None:
     can_sock = messaging.sub_sock('can')
-
   if sm is None:
-    sm = messaging.SubMaster(['model', 'controlsState', 'liveParameters'])
-
-  # *** publish radarState and liveTracks
+    sm = messaging.SubMaster(['modelV2', 'carState'])
   if pm is None:
     pm = messaging.PubMaster(['radarState', 'liveTracks'])
 
@@ -205,7 +197,8 @@ def radard_thread(sm=None, pm=None, can_sock=None):
   rk = Ratekeeper(1.0 / CP.radarTimeStep, print_delay_threshold=None)
   RD = RadarD(CP.radarTimeStep, RI.delay)
 
-  has_radar = not CP.radarOffCan
+  # TODO: always log leads once we can hide them conditionally
+  enable_lead = CP.openpilotLongitudinalControl or not CP.radarOffCan
 
   while 1:
     can_strings = messaging.drain_sock_raw(can_sock, wait_for_one=True)
@@ -216,15 +209,14 @@ def radard_thread(sm=None, pm=None, can_sock=None):
 
     sm.update(0)
 
-    dat = RD.update(rk.frame, sm, rr, has_radar)
+    dat = RD.update(sm, rr, enable_lead)
     dat.radarState.cumLagMs = -rk.remaining*1000.
 
     pm.send('radarState', dat)
 
     # *** publish tracks for UI debugging (keep last) ***
     tracks = RD.tracks
-    dat = messaging.new_message()
-    dat.init('liveTracks', len(tracks))
+    dat = messaging.new_message('liveTracks', len(tracks))
 
     for cnt, ids in enumerate(sorted(tracks.keys())):
       dat.liveTracks[cnt] = {

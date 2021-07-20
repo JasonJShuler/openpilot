@@ -1,6 +1,112 @@
-Version 0.7.4 (2020-xx-xx)
+Version 0.8.2 (2021-02-26)
 ========================
+ * Use model points directly in MPC (no more polyfits), making lateral planning more accurate
+ * Use model heading prediction for smoother lateral control
+ * Smarter actuator delay compensation
+ * Improve qcamera resolution for improved video in explorer and connect
+ * Adjust maximum engagement speed to better fit the model's training distribution
+ * New driver monitoring model trained with 3x more diverse data
+ * Improved face detection with masks
+ * More predictable DM alerts when visibility is bad
+ * Rewritten video streaming between openpilot processes
+ * Improved longitudinal tuning on TSS2 Corolla and Rav4 thanks to briskspirit!
+ * Audi A3 2015 and 2017 support thanks to keeleysam!
+ * Nissan Altima 2020 support thanks to avolmensky!
+ * Lexus ES Hybrid 2018 support thanks to TheInventorMan!
+ * Toyota Camry Hybrid 2021 support thanks to alancyau!
+
+Version 0.8.1 (2020-12-21)
+========================
+ * Original EON is deprecated, upgrade to comma two
+ * Better model performance in heavy rain
+ * Better lane positioning in turns
+ * Fixed bug where model would cut turns on empty roads at night
+ * Fixed issue where some Toyotas would not completely stop thanks to briskspirit!
+ * Toyota Camry 2021 with TSS2.5 support
+ * Hyundai Ioniq Electric 2020 support thanks to baldwalker!
+
+Version 0.8.0 (2020-11-30)
+========================
+ * New driving model: fully 3D and improved cut-in detection
+ * UI draws 2 road edges, 4 lanelines and paths in 3D
+ * Major fixes to cut-in detection for openpilot longitudinal
+ * Grey panda is no longer supported, upgrade to comma two or black panda
+ * Lexus NX 2018 support thanks to matt12eagles!
+ * Kia Niro EV 2020 support thanks to nickn17!
+ * Toyota Prius 2021 support thanks to rav4kumar!
+ * Improved lane positioning with uncertain lanelines, wide lanes and exits
+ * Improved lateral control for Prius and Subaru
+
+Version 0.7.10 (2020-10-29)
+========================
+ * Grey panda is deprecated, upgrade to comma two or black panda
+ * NEOS update: update to Python 3.8.2 and lower CPU frequency
+ * Improved thermals due to reduced CPU frequency
+ * Update SNPE to 1.41.0
+ * Reduced offroad power consumption
+ * Various system stability improvements
+ * Acura RDX 2020 support thanks to csouers!
+
+Version 0.7.9 (2020-10-09)
+========================
+ * Improved car battery power management
+ * Improved updater robustness
+ * Improved realtime performance
+ * Reduced UI and modeld lags
+ * Increased torque on 2020 Hyundai Sonata and Palisade
+
+Version 0.7.8 (2020-08-19)
+========================
+ * New driver monitoring model: improved face detection and better compatibility with sunglasses
+ * Download NEOS operating system updates in the background
+ * Improved updater reliability and responsiveness
+ * Hyundai Kona 2020, Veloster 2019, and Genesis G70 2018 support thanks to xps-genesis!
+
+Version 0.7.7 (2020-07-20)
+========================
+ * White panda is no longer supported, upgrade to comma two or black panda
+ * Improved vehicle model estimation using high precision localizer
+ * Improved thermal management on comma two
+ * Improved autofocus for road-facing camera
+ * Improved noise performance for driver-facing camera
+ * Block lane change start using blindspot monitor on select Toyota, Hyundai, and Subaru
+ * Fix GM ignition detection
+ * Code cleanup and smaller release sizes
+ * Hyundai Sonata 2020 promoted to officially supported car
+ * Hyundai Ioniq Electric Limited 2019 and Ioniq SE 2020 support thanks to baldwalker!
+ * Subaru Forester 2019 and Ascent 2019 support thanks to martinl!
+
+Version 0.7.6.1 (2020-06-16)
+========================
+ * Hotfix: update kernel on some comma twos (orders #8570-#8680)
+
+Version 0.7.6 (2020-06-05)
+========================
+ * White panda is deprecated, upgrade to comma two or black panda
+ * 2017 Nissan X-Trail, 2018-19 Leaf and 2019 Rogue support thanks to avolmensky!
+ * 2017 Mazda CX-5 support in dashcam mode thanks to Jafaral!
+ * Huge CPU savings in modeld by using thneed!
+ * Lots of code cleanup and refactors
+
+Version 0.7.5 (2020-05-13)
+========================
+ * Right-Hand Drive support for both driving and driver monitoring!
+ * New driving model: improved at sharp turns and lead speed estimation
+ * New driver monitoring model: overall improvement on comma two
+ * Driver camera preview in settings to improve mounting position
+ * Added support for many Hyundai, Kia, Genesis models thanks to xx979xx!
+ * Improved lateral tuning for 2020 Toyota Rav 4 (hybrid)
+
+Version 0.7.4 (2020-03-20)
+========================
+ * New driving model: improved lane changes and lead car detection
+ * Improved driver monitoring model: improve eye detection
+ * Improved calibration stability
+ * Improved lateral control on some 2019 and 2020 Toyota Prius
+ * Improved lateral control on VW Golf: 20% more steering torque
+ * Fixed bug where some 2017 and 2018 Toyota C-HR would use the wrong steering angle sensor
  * Support for Honda Insight thanks to theantihero!
+ * Code cleanup in car abstraction layers and ui
 
 Version 0.7.3 (2020-02-21)
 ========================
@@ -425,96 +531,96 @@ Version 0.3.4 (2017-07-28)
 
 Version 0.3.3  (2017-06-28)
 ===========================
-  * Improved model trained on more data
-  * Alpha CR-V support thanks to energee and johnnwvs!
-  * Using the opendbc project for DBC files
-  * Minor performance improvements
-  * UI update thanks to pjlao307
-  * Power off button
-  * 6% more torque on the Civic
+ * Improved model trained on more data
+ * Alpha CR-V support thanks to energee and johnnwvs!
+ * Using the opendbc project for DBC files
+ * Minor performance improvements
+ * UI update thanks to pjlao307
+ * Power off button
+ * 6% more torque on the Civic
 
 Version 0.3.2  (2017-05-22)
 ===========================
-  * Minor stability bugfixes
-  * Added metrics and rear view mirror disable to settings
-  * Update model with more crowdsourced data
+ * Minor stability bugfixes
+ * Added metrics and rear view mirror disable to settings
+ * Update model with more crowdsourced data
 
 Version 0.3.1  (2017-05-17)
 ===========================
-  * visiond stability bugfix
-  * Add logging for angle and flashing
+ * visiond stability bugfix
+ * Add logging for angle and flashing
 
 Version 0.3.0  (2017-05-12)
 ===========================
-  * Add CarParams struct to improve the abstraction layer
-  * Refactor visiond IPC to support multiple clients
-  * Add raw GPS and beginning support for navigation
-  * Improve model in visiond using crowdsourced data
-  * Add improved system logging to diagnose instability
-  * Rewrite baseui in React Native
-  * Moved calibration to the cloud
+ * Add CarParams struct to improve the abstraction layer
+ * Refactor visiond IPC to support multiple clients
+ * Add raw GPS and beginning support for navigation
+ * Improve model in visiond using crowdsourced data
+ * Add improved system logging to diagnose instability
+ * Rewrite baseui in React Native
+ * Moved calibration to the cloud
 
 Version 0.2.9  (2017-03-01)
 ===========================
-  * Retain compatibility with NEOS v1
+ * Retain compatibility with NEOS v1
 
 Version 0.2.8  (2017-02-27)
 ===========================
-  * Fix bug where frames were being dropped in minute 71
+ * Fix bug where frames were being dropped in minute 71
 
 Version 0.2.7  (2017-02-08)
 ===========================
-  * Better performance and pictures at night
-  * Fix ptr alignment issue in boardd
-  * Fix brake error light, fix crash if too cold
+ * Better performance and pictures at night
+ * Fix ptr alignment issue in boardd
+ * Fix brake error light, fix crash if too cold
 
 Version 0.2.6  (2017-01-31)
 ===========================
-  * Fix bug in visiond model execution
+ * Fix bug in visiond model execution
 
 Version 0.2.5  (2017-01-30)
 ===========================
-  * Fix race condition in manager
+ * Fix race condition in manager
 
 Version 0.2.4  (2017-01-27)
 ===========================
-  * OnePlus 3T support
-  * Enable installation as NEOS app
-  * Various minor bugfixes
+ * OnePlus 3T support
+ * Enable installation as NEOS app
+ * Various minor bugfixes
 
 Version 0.2.3  (2017-01-11)
 ===========================
-  * Reduce space usage by 80%
-  * Add better logging
-  * Add Travis CI
+ * Reduce space usage by 80%
+ * Add better logging
+ * Add Travis CI
 
 Version 0.2.2  (2017-01-10)
 ===========================
-  * Board triggers started signal on CAN messages
-  * Improved autoexposure
-  * Handle out of space, improve upload status
+ * Board triggers started signal on CAN messages
+ * Improved autoexposure
+ * Handle out of space, improve upload status
 
 Version 0.2.1  (2016-12-14)
 ===========================
-  * Performance improvements, removal of more numpy
-  * Fix boardd process priority
-  * Make counter timer reset on use of steering wheel
+ * Performance improvements, removal of more numpy
+ * Fix boardd process priority
+ * Make counter timer reset on use of steering wheel
 
 Version 0.2  (2016-12-12)
 =========================
-  * Car/Radar abstraction layers have shipped, see cereal/car.capnp
-  * controlsd has been refactored
-  * Shipped plant model and testing maneuvers
-  * visiond exits more gracefully now
-  * Hardware encoder in visiond should always init
-  * ui now turns off the screen after 30 seconds
-  * Switch to openpilot release branch for future releases
-  * Added preliminary Docker container to run tests on PC
+ * Car/Radar abstraction layers have shipped, see cereal/car.capnp
+ * controlsd has been refactored
+ * Shipped plant model and testing maneuvers
+ * visiond exits more gracefully now
+ * Hardware encoder in visiond should always init
+ * ui now turns off the screen after 30 seconds
+ * Switch to openpilot release branch for future releases
+ * Added preliminary Docker container to run tests on PC
 
 Version 0.1  (2016-11-29)
 =========================
-  * Initial release of openpilot
-  * Adaptive cruise control is working
-  * Lane keep assist is working
-  * Support for Acura ILX 2016 with AcuraWatch Plus
-  * Support for Honda Civic 2016 Touring Edition
+ * Initial release of openpilot
+ * Adaptive cruise control is working
+ * Lane keep assist is working
+ * Support for Acura ILX 2016 with AcuraWatch Plus
+ * Support for Honda Civic 2016 Touring Edition

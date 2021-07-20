@@ -5,8 +5,8 @@ from opendbc.can.can_define import CANDefine
 from opendbc.can.parser import CANParser
 from selfdrive.car.interfaces import CarStateBase
 from selfdrive.car.gm.values import DBC, CAR, AccState, CanBus, \
-                                    CruiseButtons, is_eps_status_ok, \
-                                    STEER_THRESHOLD, SUPERCRUISE_CARS
+                                    CruiseButtons, STEER_THRESHOLD, \
+                                    REGEN_CARS
 
 
 class CarState(CarStateBase):
@@ -14,7 +14,6 @@ class CarState(CarStateBase):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]['pt'])
     self.shifter_values = can_define.dv["ECMPRDNL"]["PRNDL"]
-    self.user_gas, self.user_gas_pressed = 0., 0
 
   def update(self, pt_cp):
     ret = car.CarState.new_message()
@@ -28,9 +27,11 @@ class CarState(CarStateBase):
     ret.wheelSpeeds.rr = pt_cp.vl["EBCMWheelSpdRear"]['RRWheelSpd'] * CV.KPH_TO_MS
     ret.vEgoRaw = mean([ret.wheelSpeeds.fl, ret.wheelSpeeds.fr, ret.wheelSpeeds.rl, ret.wheelSpeeds.rr])
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
-    ret.standstill = ret.vEgoRaw < 0.01
+    #ret.vEgo = pt_cp.vl["ECMVehicleSpeed"]["VehicleSpeed"] * CV.MPH_TO_MS
+    ret.standstill = not ret.vEgoRaw > 0.1
 
-    ret.steeringAngle = pt_cp.vl["PSCMSteeringAngle"]['SteeringWheelAngle']
+    ret.steeringAngleDeg = pt_cp.vl["PSCMSteeringAngle"]['SteeringWheelAngle']
+    ret.steeringRateDeg = pt_cp.vl["PSCMSteeringAngle"]['SteeringWheelRate']
     ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(pt_cp.vl["ECMPRDNL"]['PRNDL'], None))
     ret.brake = pt_cp.vl["EBCMBrakePedalPosition"]['BrakePedalPosition'] / 0xd0
     # Brake pedal's potentiometer returns near-zero reading even when pedal is not pressed.
@@ -38,67 +39,60 @@ class CarState(CarStateBase):
       ret.brake = 0.
 
 
-    # # TODO: need a better way to identify cars without ACC
-    # # TODO: this assumes the Pedal is present. If it isn't, this won't work...
-    # if self.CP.carFingerprint in (CAR.BOLT):
-    #   ret.gas = self.pedal_gas / 256.
-    # else:
     ret.gas = pt_cp.vl["AcceleratorPedal"]['AcceleratorPedal'] / 254.
-
-    # this is a hack for the interceptor. This is now only used in the simulation
-    # TODO: Replace tests by toyota so this can go away
-    if self.CP.enableGasInterceptor:
-      self.user_gas = (pt_cp.vl["GAS_SENSOR"]['INTERCEPTOR_GAS'] + pt_cp.vl["GAS_SENSOR"]['INTERCEPTOR_GAS2']) / 2.
-      self.user_gas_pressed = self.user_gas > 20 # this works because interceptor read < 0 when pedal position is 0. Once calibrated, this will change
-      ret.gasPressed = self.user_gas_pressed
-      #workaround for insta-disengage
-      #ret.gasPressed = False
-    else:
+    # Disable gaspress event for gas interceptor, indistinguishable
+    # TODO: compute whether user is applying gas, and use that to disable OP
+    if not self.CP.enableGasInterceptor:
       ret.gasPressed = ret.gas > 1e-5
-
-
-    #ret.gasPressed = ret.gas > 1e-5
+    else:
+      ret.gasPressed = False
 
     ret.steeringTorque = pt_cp.vl["PSCMStatus"]['LKADriverAppldTrq']
+    ret.steeringTorqueEps = pt_cp.vl["PSCMStatus"]['LKATotalTorqueDelivered']
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
 
     # 1 - open, 0 - closed
     ret.doorOpen = (pt_cp.vl["BCMDoorBeltStatus"]['FrontLeftDoor'] == 1 or
-      pt_cp.vl["BCMDoorBeltStatus"]['FrontRightDoor'] == 1 or
-      pt_cp.vl["BCMDoorBeltStatus"]['RearLeftDoor'] == 1 or
-      pt_cp.vl["BCMDoorBeltStatus"]['RearRightDoor'] == 1)
+                    pt_cp.vl["BCMDoorBeltStatus"]['FrontRightDoor'] == 1 or
+                    pt_cp.vl["BCMDoorBeltStatus"]['RearLeftDoor'] == 1 or
+                    pt_cp.vl["BCMDoorBeltStatus"]['RearRightDoor'] == 1)
 
     # 1 - latched
     ret.seatbeltUnlatched = pt_cp.vl["BCMDoorBeltStatus"]['LeftSeatBelt'] == 0
     ret.leftBlinker = pt_cp.vl["BCMTurnSignals"]['TurnSignals'] == 1
     ret.rightBlinker = pt_cp.vl["BCMTurnSignals"]['TurnSignals'] == 2
 
-    if self.car_fingerprint in SUPERCRUISE_CARS:
-      self.park_brake = False
-      ret.cruiseState.available = False
-      ret.espDisabled = False
-      regen_pressed = False
-      self.pcm_acc_status = int(pt_cp.vl["ASCMActiveCruiseControlStatus"]['ACCCmdActive'])
+    self.park_brake = pt_cp.vl["EPBStatus"]['EPBClosed']
+    self.main_on = bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
+    ret.espDisabled = pt_cp.vl["ESPStatus"]['TractionControlOn'] != 1
+    self.pcm_acc_status = pt_cp.vl["ASCMActiveCruiseControlStatus"]['ACCCmdActive']
+    if self.CP.enableGasInterceptor:
+      ret.cruiseState.available = not bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
     else:
-      self.park_brake = pt_cp.vl["EPBStatus"]['EPBClosed']
       ret.cruiseState.available = bool(pt_cp.vl["ECMEngineStatus"]['CruiseMainOn'])
-      ret.espDisabled = pt_cp.vl["ESPStatus"]['TractionControlOn'] != 1
-      self.pcm_acc_status = pt_cp.vl["AcceleratorPedal2"]['CruiseState']
-      if self.car_fingerprint == CAR.VOLT or self.car_fingerprint == CAR.BOLT:
-        regen_pressed = bool(pt_cp.vl["EBCMRegenPaddle"]['RegenPaddle'])
-      else:
-        regen_pressed = False
-
-    # Regen braking is braking
-    ret.brakePressed = ret.brake > 1e-5 or regen_pressed
     ret.cruiseState.enabled = self.pcm_acc_status != AccState.OFF
     ret.cruiseState.standstill = self.pcm_acc_status == AccState.STANDSTILL
 
+    # Regen braking is braking
+    self.regen_pressed = False
+    if self.car_fingerprint in REGEN_CARS:
+      self.regen_pressed = bool(pt_cp.vl["EBCMRegenPaddle"]['RegenPaddle'])
+    ret.brakePressed = ret.brake > 1e-5 or self.regen_pressed
+
+    brake_light_enable = False
+    if self.car_fingerprint == CAR.BOLT:
+      if ret.aEgo < -1.3:
+        brake_light_enable = True
+
+    ret.brakeLights = ret.brakePressed or self.regen_pressed or brake_light_enable
     # 0 - inactive, 1 - active, 2 - temporary limited, 3 - failed
     self.lkas_status = pt_cp.vl["PSCMStatus"]['LKATorqueDeliveredStatus']
-    self.steer_warning = not is_eps_status_ok(self.lkas_status, self.car_fingerprint)
-    self.steer_not_allowed = not is_eps_status_ok(self.lkas_status, self.car_fingerprint)
+    ret.steerWarning = self.lkas_status not in [0, 1]
 
+    if self.car_fingerprint == CAR.BOLT:
+      self.HVBvoltage = pt_cp.vl["BECMBatteryVoltageCurrent"]['HVBatteryVoltage']
+      self.HVBcurrent = pt_cp.vl["BECMBatteryVoltageCurrent"]['HVBatteryCurrent']
+      ret.hvBpower = self.HVBvoltage * self.HVBcurrent / 1000   #kW
     return ret
 
   @staticmethod
@@ -115,8 +109,10 @@ class CarState(CarStateBase):
       ("RightSeatBelt", "BCMDoorBeltStatus", 0),
       ("TurnSignals", "BCMTurnSignals", 0),
       ("AcceleratorPedal", "AcceleratorPedal", 0),
+      ("CruiseState", "AcceleratorPedal2", 0),
       ("ACCButtons", "ASCMSteeringButton", CruiseButtons.UNPRESS),
       ("SteeringWheelAngle", "PSCMSteeringAngle", 0),
+      ("SteeringWheelRate", "PSCMSteeringAngle", 0),
       ("FLWheelSpd", "EBCMWheelSpdFront", 0),
       ("FRWheelSpd", "EBCMWheelSpdFront", 0),
       ("RLWheelSpd", "EBCMWheelSpdRear", 0),
@@ -124,30 +120,19 @@ class CarState(CarStateBase):
       ("PRNDL", "ECMPRDNL", 0),
       ("LKADriverAppldTrq", "PSCMStatus", 0),
       ("LKATorqueDeliveredStatus", "PSCMStatus", 0),
+      ("TractionControlOn", "ESPStatus", 0),
+      ("EPBClosed", "EPBStatus", 0),
+      ("CruiseMainOn", "ECMEngineStatus", 0),
+      ("ACCCmdActive", "ASCMActiveCruiseControlStatus", 0),
+      ("LKATotalTorqueDelivered", "PSCMStatus", 0),
+      ("VehicleSpeed", "ECMVehicleSpeed", 0),
     ]
 
     if CP.carFingerprint == CAR.VOLT or CP.carFingerprint == CAR.BOLT:
       signals += [
         ("RegenPaddle", "EBCMRegenPaddle", 0),
+        ("HVBatteryVoltage", "BECMBatteryVoltageCurrent", 0),
+        ("HVBatteryCurrent", "BECMBatteryVoltageCurrent", 0),
       ]
-    if CP.carFingerprint in SUPERCRUISE_CARS:
-      signals += [
-        ("ACCCmdActive", "ASCMActiveCruiseControlStatus", 0)
-      ]
-    else:
-      signals += [
-        ("TractionControlOn", "ESPStatus", 0),
-        ("EPBClosed", "EPBStatus", 0),
-        ("CruiseMainOn", "ECMEngineStatus", 0),
-        ("CruiseState", "AcceleratorPedal2", 0),
-      ]
-
-    # add gas interceptor reading if we are using it
-    if CP.enableGasInterceptor:
-      signals += [
-        ("INTERCEPTOR_GAS", "GAS_SENSOR", 0),
-        ("INTERCEPTOR_GAS2", "GAS_SENSOR", 0)
-      ]
-      #checks.append(("GAS_SENSOR", 50))
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, [], CanBus.POWERTRAIN)

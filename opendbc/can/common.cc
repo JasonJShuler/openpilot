@@ -18,10 +18,53 @@ unsigned int toyota_checksum(unsigned int address, uint64_t d, int l) {
   d >>= 8; // remove checksum
 
   unsigned int s = l;
-  while (address) { s += address & 0xff; address >>= 8; }
-  while (d) { s += d & 0xff; d >>= 8; }
+  while (address) { s += address & 0xFF; address >>= 8; }
+  while (d) { s += d & 0xFF; d >>= 8; }
 
   return s & 0xFF;
+}
+
+unsigned int subaru_checksum(unsigned int address, uint64_t d, int l) {
+  d >>= ((8-l)*8); // remove padding
+
+  unsigned int s = 0;
+  while (address) { s += address & 0xFF; address >>= 8; }
+  l -= 1; // checksum is first byte
+  while (l) { s += d & 0xFF; d >>= 8; l -= 1; }
+
+  return s & 0xFF;
+}
+
+unsigned int chrysler_checksum(unsigned int address, uint64_t d, int l) {
+  /* This function does not want the checksum byte in the input data.
+  jeep chrysler canbus checksum from http://illmatics.com/Remote%20Car%20Hacking.pdf */
+  uint8_t checksum = 0xFF;
+  for (int j = 0; j < (l - 1); j++) {
+    uint8_t shift = 0x80;
+    uint8_t curr = (d >> 8*j) & 0xFF;
+    for (int i=0; i<8; i++) {
+      uint8_t bit_sum = curr & shift;
+      uint8_t temp_chk = checksum & 0x80U;
+      if (bit_sum != 0U) {
+        bit_sum = 0x1C;
+        if (temp_chk != 0U) {
+          bit_sum = 1;
+        }
+        checksum = checksum << 1;
+        temp_chk = checksum | 1U;
+        bit_sum ^= temp_chk;
+      } else {
+        if (temp_chk != 0U) {
+          bit_sum = 0x1D;
+        }
+        checksum = checksum << 1;
+        bit_sum ^= checksum;
+      }
+      checksum = bit_sum;
+      shift = shift >> 1;
+    }
+  }
+  return ~checksum & 0xFF;
 }
 
 // Static lookup table for fast computation of CRC8 poly 0x2F, aka 8H2F/AUTOSAR
@@ -54,18 +97,17 @@ unsigned int volkswagen_crc(unsigned int address, uint64_t d, int l) {
   // a magic variable padding byte tacked onto the end of the payload.
   // https://www.autosar.org/fileadmin/user_upload/standards/classic/4-3/AUTOSAR_SWS_CRCLibrary.pdf
 
-  uint8_t *dat = (uint8_t *)&d;
   uint8_t crc = 0xFF; // Standard init value for CRC8 8H2F/AUTOSAR
 
   // CRC the payload first, skipping over the first byte where the CRC lives.
   for (int i = 1; i < l; i++) {
-    crc ^= dat[i];
+    crc ^= (d >> (i*8)) & 0xFF;
     crc = crc8_lut_8h2f[crc];
   }
 
   // Look up and apply the magic final CRC padding byte, which permutes by CAN
   // address, and additionally (for SOME addresses) by the message counter.
-  uint8_t counter = dat[1] & 0x0F;
+  uint8_t counter = ((d >> 8) & 0xFF) & 0x0F;
   switch(address) {
     case 0x86:  // LWI_01 Steering Angle
       crc ^= (uint8_t[]){0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86}[counter];
@@ -85,6 +127,12 @@ unsigned int volkswagen_crc(unsigned int address, uint64_t d, int l) {
     case 0x117: // ACC_10 Automatic Cruise Control
       crc ^= (uint8_t[]){0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC,0xAC}[counter];
       break;
+    case 0x120: // TSK_06 Drivetrain Coordinator
+      crc ^= (uint8_t[]){0xC4,0xE2,0x4F,0xE4,0xF8,0x2F,0x56,0x81,0x9F,0xE5,0x83,0x44,0x05,0x3F,0x97,0xDF}[counter];
+      break;
+    case 0x121: // Motor_20 Driver Throttle Inputs
+      crc ^= (uint8_t[]){0xE9,0x65,0xAE,0x6B,0x7B,0x35,0xE5,0x5F,0x4E,0xC7,0x86,0xA2,0xBB,0xDD,0xEB,0xB4}[counter];
+      break;
     case 0x122: // ACC_06 Automatic Cruise Control
       crc ^= (uint8_t[]){0x37,0x7D,0xF3,0xA9,0x18,0x46,0x6D,0x4D,0x3D,0x71,0x92,0x9C,0xE5,0x32,0x10,0xB9}[counter];
       break;
@@ -99,6 +147,9 @@ unsigned int volkswagen_crc(unsigned int address, uint64_t d, int l) {
       break;
     case 0x30C: // ACC_02 Automatic Cruise Control
       crc ^= (uint8_t[]){0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F}[counter];
+      break;
+    case 0x30F: // SWA_01 Lane Change Assist (SpurWechselAssistent)
+      crc ^= (uint8_t[]){0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C,0x0C}[counter];
       break;
     case 0x3C0: // Klemmen_Status_01 ignition and starting status
       crc ^= (uint8_t[]){0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3,0xC3}[counter];
@@ -124,11 +175,9 @@ unsigned int pedal_checksum(uint64_t d, int l) {
   d >>= ((8-l)*8); // remove padding
   d >>= 8; // remove checksum
 
-  uint8_t *dat = (uint8_t *)&d;
-
   int i, j;
   for (i = 0; i < l - 1; i++) {
-    crc ^= dat[i];
+    crc ^= (d >> (i*8)) & 0xFF;
     for (j = 0; j < 8; j++) {
       if ((crc & 0x80) != 0) {
         crc = (uint8_t)((crc << 1) ^ poly);
